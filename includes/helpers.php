@@ -214,6 +214,53 @@ function generate_password(int $length = 10): string
     return $out;
 }
 
+/** Build pagination links preserving current query parameters. */
+function paginate_links(int $page, int $pages): string
+{
+    if ($pages <= 1) {
+        return '';
+    }
+    $url = function (int $p): string {
+        $qs = http_build_query(array_merge($_GET, ['page' => $p]));
+        return '?' . htmlspecialchars($qs, ENT_QUOTES);
+    };
+    $btn = function (string $href, string $label, bool $active = false, bool $disabled = false): string {
+        if ($disabled) {
+            return '<span class="px-3 py-2 rounded-lg text-sm bg-white border border-gray-100 text-gray-300">' . $label . '</span>';
+        }
+        $cls = $active
+            ? 'bg-navy text-white'
+            : 'bg-white border border-gray-200 text-gray-600 hover:bg-lightgrey';
+        return '<a href="' . $href . '" class="px-3 py-2 rounded-lg text-sm ' . $cls . '">' . $label . '</a>';
+    };
+
+    // Windowed page range around the current page.
+    $window = 2;
+    $start = max(1, $page - $window);
+    $end = min($pages, $page + $window);
+
+    $out = '<nav class="flex flex-wrap items-center justify-center gap-1 mt-4">';
+    $out .= $btn($url(max(1, $page - 1)), '&larr; Prev', false, $page <= 1);
+    if ($start > 1) {
+        $out .= $btn($url(1), '1');
+        if ($start > 2) {
+            $out .= '<span class="px-2 text-gray-400">…</span>';
+        }
+    }
+    for ($p = $start; $p <= $end; $p++) {
+        $out .= $btn($url($p), (string) $p, $p === $page);
+    }
+    if ($end < $pages) {
+        if ($end < $pages - 1) {
+            $out .= '<span class="px-2 text-gray-400">…</span>';
+        }
+        $out .= $btn($url($pages), (string) $pages);
+    }
+    $out .= $btn($url(min($pages, $page + 1)), 'Next &rarr;', false, $page >= $pages);
+    $out .= '</nav>';
+    return $out;
+}
+
 /** Render a small status badge. */
 function status_badge(string $status): string
 {

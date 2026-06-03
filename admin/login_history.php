@@ -30,19 +30,31 @@ if ($result === 'success') {
 }
 
 $in = implode(',', array_fill(0, count($actionFilter), '?'));
-$sql = "SELECT al.created_at, al.action, al.ip, al.user_agent, al.details, u.email AS user_email
-        FROM audit_log al
-        LEFT JOIN users u ON u.id = al.user_id
-        WHERE al.action IN ($in) AND al.created_at BETWEEN ? AND ?";
+$where = "al.action IN ($in) AND al.created_at BETWEEN ? AND ?";
 $params = array_merge($actionFilter, [$fromDt, $toDt]);
-
 if ($q !== '') {
-    $sql .= ' AND (u.email LIKE ? OR al.details LIKE ?)';
+    $where .= ' AND (u.email LIKE ? OR al.details LIKE ?)';
     $params[] = '%' . $q . '%';
     $params[] = '%' . $q . '%';
 }
-$sql .= ' ORDER BY al.created_at DESC LIMIT 500';
-$stmt = db()->prepare($sql);
+
+// Pagination (50 per page).
+$perPage = 50;
+$page = max(1, int_val(get('page')));
+$countStmt = db()->prepare("SELECT COUNT(*) FROM audit_log al LEFT JOIN users u ON u.id = al.user_id WHERE $where");
+$countStmt->execute($params);
+$total = (int) $countStmt->fetchColumn();
+$pages = max(1, (int) ceil($total / $perPage));
+$page = min($page, $pages);
+$offset = ($page - 1) * $perPage;
+
+$stmt = db()->prepare(
+    "SELECT al.created_at, al.action, al.ip, al.user_agent, al.details, u.email AS user_email
+     FROM audit_log al
+     LEFT JOIN users u ON u.id = al.user_id
+     WHERE $where
+     ORDER BY al.created_at DESC LIMIT $perPage OFFSET $offset"
+);
 $stmt->execute($params);
 $rows = $stmt->fetchAll();
 
@@ -62,7 +74,7 @@ $pageTitle = 'Login History';
 require dirname(__DIR__) . '/includes/header.php';
 ?>
 <h1 class="text-2xl font-bold text-navy mb-1">Login History</h1>
-<p class="text-gray-500 mb-6 text-sm">Login activity recorded in the audit log (most recent 500 within the range).</p>
+<p class="text-gray-500 mb-6 text-sm">Login activity recorded in the audit log — <?= number_format($total) ?> record<?= $total === 1 ? '' : 's' ?> in range.</p>
 
 <form method="get" class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-6 grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
   <div>
@@ -136,5 +148,7 @@ require dirname(__DIR__) . '/includes/header.php';
     </tbody>
   </table>
 </div>
+
+<?= paginate_links($page, $pages) ?>
 
 <?php require dirname(__DIR__) . '/includes/footer.php'; ?>

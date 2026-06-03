@@ -262,14 +262,27 @@ function handle_association_csv(): array
 }
 
 $fName = get('q');
-$listSql = 'SELECT a.*, u.email, u.status FROM associations a JOIN users u ON u.id = a.user_id';
+$where = '';
 $listParams = [];
 if ($fName !== '') {
-    $listSql .= ' WHERE a.name LIKE :q';
+    $where = ' WHERE a.name LIKE :q';
     $listParams[':q'] = '%' . $fName . '%';
 }
-$listSql .= ' ORDER BY a.name';
-$listStmt = db()->prepare($listSql);
+
+// Pagination (25 per page).
+$perPage = 25;
+$page = max(1, int_val(get('page')));
+$countStmt = db()->prepare('SELECT COUNT(*) FROM associations a' . $where);
+$countStmt->execute($listParams);
+$total = (int) $countStmt->fetchColumn();
+$pages = max(1, (int) ceil($total / $perPage));
+$page = min($page, $pages);
+$offset = ($page - 1) * $perPage;
+
+$listStmt = db()->prepare(
+    'SELECT a.*, u.email, u.status FROM associations a JOIN users u ON u.id = a.user_id'
+    . $where . " ORDER BY a.name LIMIT $perPage OFFSET $offset"
+);
 $listStmt->execute($listParams);
 $rows = $listStmt->fetchAll();
 
@@ -373,6 +386,8 @@ require dirname(__DIR__) . '/includes/header.php';
     </tbody>
   </table>
 </div>
+
+<?= paginate_links($page, $pages) ?>
 
 <!-- Create modal -->
 <div id="createModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
