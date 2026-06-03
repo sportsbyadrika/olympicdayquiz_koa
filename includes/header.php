@@ -56,6 +56,10 @@ function nav_links(?string $role): array
 }
 
 $links = nav_links($role);
+// Every authenticated role gets a My Account entry (profile + password change).
+if (is_logged_in()) {
+    $links[] = ['/public/account.php', 'My Account'];
+}
 $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '';
 ?>
 <!DOCTYPE html>
