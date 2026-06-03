@@ -248,17 +248,29 @@ $syllabi = lookup_map('syllabi');
 // Filters: name (textbox) + type (dropdown).
 $fName = get('q');
 $fType = int_val(get('type'));
-$listSql = 'SELECT s.*, u.email AS login_email, u.status, st.name AS type_name, sy.name AS syllabus_name
-            FROM schools s
-            JOIN users u ON u.id = s.user_id
-            LEFT JOIN school_types st ON st.id = s.school_type_id
-            LEFT JOIN syllabi sy ON sy.id = s.syllabus_id
-            WHERE 1=1';
+$where = ' WHERE 1=1';
 $listParams = [];
-if ($fName !== '') { $listSql .= ' AND s.name LIKE :q'; $listParams[':q'] = '%' . $fName . '%'; }
-if ($fType) { $listSql .= ' AND s.school_type_id = :type'; $listParams[':type'] = $fType; }
-$listSql .= ' ORDER BY s.name';
-$listStmt = db()->prepare($listSql);
+if ($fName !== '') { $where .= ' AND s.name LIKE :q'; $listParams[':q'] = '%' . $fName . '%'; }
+if ($fType) { $where .= ' AND s.school_type_id = :type'; $listParams[':type'] = $fType; }
+
+// Pagination (25 per page).
+$perPage = 25;
+$page = max(1, int_val(get('page')));
+$countStmt = db()->prepare('SELECT COUNT(*) FROM schools s' . $where);
+$countStmt->execute($listParams);
+$total = (int) $countStmt->fetchColumn();
+$pages = max(1, (int) ceil($total / $perPage));
+$page = min($page, $pages);
+$offset = ($page - 1) * $perPage;
+
+$listStmt = db()->prepare(
+    'SELECT s.*, u.email AS login_email, u.status, st.name AS type_name, sy.name AS syllabus_name
+     FROM schools s
+     JOIN users u ON u.id = s.user_id
+     LEFT JOIN school_types st ON st.id = s.school_type_id
+     LEFT JOIN syllabi sy ON sy.id = s.syllabus_id'
+    . $where . " ORDER BY s.name LIMIT $perPage OFFSET $offset"
+);
 $listStmt->execute($listParams);
 $rows = $listStmt->fetchAll();
 
@@ -337,6 +349,8 @@ require dirname(__DIR__) . '/includes/header.php';
     </tbody>
   </table>
 </div>
+
+<?= paginate_links($page, $pages) ?>
 
 <!-- Create modal -->
 <div id="createModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 overflow-y-auto">
