@@ -32,7 +32,7 @@ $errors = [];
 // Values used to (re)populate the form.
 $v = [
     'question_text' => '', 'option_a' => '', 'option_b' => '', 'option_c' => '', 'option_d' => '',
-    'correct_option' => '', 'sport' => '', 'category' => '', 'difficulty' => 'Medium',
+    'correct_option' => '', 'sport' => '', 'category' => '', 'difficulty' => '',
     'reference_source' => '', 'explanation' => '',
 ];
 
@@ -109,7 +109,7 @@ require dirname(__DIR__) . '/includes/header.php';
   </div>
 <?php endif; ?>
 
-<form method="post" class="max-w-6xl">
+<form method="post" class="w-full">
   <?= csrf_field() ?>
   <input type="hidden" name="question_id" value="<?= (int) $editId ?>">
 
@@ -144,32 +144,36 @@ require dirname(__DIR__) . '/includes/header.php';
       </div>
     </div>
 
-    <!-- Side panel: classification details -->
-    <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5 sm:p-6 lg:sticky lg:top-20">
-      <h2 class="font-semibold text-navy mb-4">Details</h2>
-      <div class="space-y-4">
-        <div>
-          <label class="block text-sm font-medium mb-1">Difficulty</label>
-          <select name="difficulty" class="w-full border border-gray-300 rounded-lg px-3 py-2.5">
-            <?php foreach (['Easy', 'Medium', 'Hard'] as $lvl): ?>
-              <option <?= $v['difficulty'] === $lvl ? 'selected' : '' ?>><?= $lvl ?></option>
-            <?php endforeach; ?>
-          </select>
+    <!-- Side panel: classification details + actions -->
+    <div class="lg:sticky lg:top-20">
+      <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5 sm:p-6">
+        <h2 class="font-semibold text-navy mb-4">Details</h2>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">Difficulty *</label>
+            <select name="difficulty" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5">
+              <option value="" <?= $v['difficulty'] === '' ? 'selected' : '' ?>>— Select —</option>
+              <?php foreach (['Easy', 'Medium', 'Hard'] as $lvl): ?>
+                <option <?= $v['difficulty'] === $lvl ? 'selected' : '' ?>><?= $lvl ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div><label class="block text-sm font-medium mb-1">Sport *</label><input name="sport" required value="<?= e($v['sport']) ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2.5"></div>
+          <div><label class="block text-sm font-medium mb-1">Category</label><input name="category" value="<?= e($v['category']) ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2.5"></div>
+          <div><label class="block text-sm font-medium mb-1">Reference / Source</label><input name="reference_source" value="<?= e($v['reference_source']) ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2.5"></div>
         </div>
-        <div><label class="block text-sm font-medium mb-1">Sport</label><input name="sport" value="<?= e($v['sport']) ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2.5"></div>
-        <div><label class="block text-sm font-medium mb-1">Category</label><input name="category" value="<?= e($v['category']) ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2.5"></div>
-        <div><label class="block text-sm font-medium mb-1">Reference / Source</label><input name="reference_source" value="<?= e($v['reference_source']) ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2.5"></div>
+        <p class="text-xs text-gray-400 mt-4">Category and Reference are optional but recommended.</p>
       </div>
-      <p class="text-xs text-gray-400 mt-4">Sport, Category and Reference are optional but recommended.</p>
-    </div>
-  </div>
 
-  <div class="flex flex-wrap gap-2 mt-6 max-w-6xl">
-    <button type="submit" name="action" value="save" class="bg-navy text-white rounded-lg px-5 py-2.5 font-medium min-h-[44px]"><?= $isEdit ? 'Save Changes' : 'Save' ?></button>
-    <?php if (!$isEdit): ?>
-      <button type="submit" name="action" value="save_new" class="bg-teal text-white rounded-lg px-5 py-2.5 font-medium min-h-[44px]">Save &amp; Enter New Question</button>
-    <?php endif; ?>
-    <a href="<?= e(BASE_URL) ?>/association/question_bank.php" class="px-5 py-2.5 rounded-lg border border-gray-300 self-center">Cancel</a>
+      <!-- Actions, tucked under the Details panel -->
+      <div class="flex flex-col gap-2 mt-4">
+        <button type="submit" name="action" value="save" class="bg-navy text-white rounded-lg px-5 py-2.5 font-medium min-h-[44px]"><?= $isEdit ? 'Save Changes' : 'Save' ?></button>
+        <?php if (!$isEdit): ?>
+          <button type="submit" name="action" value="save_new" class="bg-teal text-white rounded-lg px-5 py-2.5 font-medium min-h-[44px]">Save &amp; Enter New Question</button>
+        <?php endif; ?>
+        <a href="<?= e(BASE_URL) ?>/association/question_bank.php" class="text-center px-5 py-2.5 rounded-lg border border-gray-300">Cancel</a>
+      </div>
+    </div>
   </div>
 </form>
 
