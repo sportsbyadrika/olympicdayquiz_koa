@@ -121,7 +121,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     }
 }
 
-$rows = db()->query('SELECT e.*, u.email, u.status FROM experts e JOIN users u ON u.id=e.user_id ORDER BY e.name')->fetchAll();
+$rows = db()->query(
+    "SELECT e.*, u.email, u.status, ll.last_login
+     FROM experts e
+     JOIN users u ON u.id = e.user_id
+     LEFT JOIN (SELECT user_id, MAX(created_at) AS last_login FROM audit_log WHERE action='login_success' GROUP BY user_id) ll ON ll.user_id = u.id
+     ORDER BY e.name"
+)->fetchAll();
 
 $pageTitle = 'Experts';
 require dirname(__DIR__) . '/includes/header.php';
@@ -134,15 +140,16 @@ require dirname(__DIR__) . '/includes/header.php';
 <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
   <table class="min-w-full text-sm">
     <thead class="bg-lightgrey text-gray-600 text-left">
-      <tr><th class="px-4 py-3">Name</th><th class="px-4 py-3">Email</th><th class="px-4 py-3">Phone</th><th class="px-4 py-3 text-right">Actions</th></tr>
+      <tr><th class="px-4 py-3">Name</th><th class="px-4 py-3">Email</th><th class="px-4 py-3">Phone</th><th class="px-4 py-3 text-center">Last login</th><th class="px-4 py-3 text-right">Actions</th></tr>
     </thead>
     <tbody class="divide-y divide-gray-100">
-      <?php if (!$rows): ?><tr><td colspan="4" class="px-4 py-8 text-center text-gray-400">No experts yet.</td></tr><?php endif; ?>
+      <?php if (!$rows): ?><tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">No experts yet.</td></tr><?php endif; ?>
       <?php foreach ($rows as $r): ?>
         <tr>
           <td class="px-4 py-3 font-medium text-navy"><?= e($r['name']) ?></td>
           <td class="px-4 py-3 text-gray-600"><?= e($r['email']) ?></td>
           <td class="px-4 py-3 text-gray-600"><?= e($r['phone']) ?></td>
+          <td class="px-4 py-3 text-center"><?= last_login_badge($r['last_login']) ?></td>
           <td class="px-4 py-3 text-right whitespace-nowrap">
             <div class="inline-flex items-center gap-3">
               <button title="Edit" class="text-navy hover:opacity-70" onclick='openEdit(<?= json_encode(["id"=>(int)$r["id"],"name"=>$r["name"],"email"=>$r["email"],"phone"=>$r["phone"],"details"=>$r["details"]], JSON_HEX_APOS|JSON_HEX_QUOT) ?>)'>

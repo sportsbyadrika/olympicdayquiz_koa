@@ -264,11 +264,12 @@ $page = min($page, $pages);
 $offset = ($page - 1) * $perPage;
 
 $listStmt = db()->prepare(
-    'SELECT s.*, u.email AS login_email, u.status, st.name AS type_name, sy.name AS syllabus_name
+    "SELECT s.*, u.email AS login_email, u.status, st.name AS type_name, sy.name AS syllabus_name, ll.last_login
      FROM schools s
      JOIN users u ON u.id = s.user_id
      LEFT JOIN school_types st ON st.id = s.school_type_id
-     LEFT JOIN syllabi sy ON sy.id = s.syllabus_id'
+     LEFT JOIN syllabi sy ON sy.id = s.syllabus_id
+     LEFT JOIN (SELECT user_id, MAX(created_at) AS last_login FROM audit_log WHERE action='login_success' GROUP BY user_id) ll ON ll.user_id = u.id"
     . $where . " ORDER BY s.name LIMIT $perPage OFFSET $offset"
 );
 $listStmt->execute($listParams);
@@ -321,10 +322,10 @@ require dirname(__DIR__) . '/includes/header.php';
 <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
   <table class="min-w-full text-sm">
     <thead class="bg-lightgrey text-gray-600 text-left">
-      <tr><th class="px-4 py-3">Code</th><th class="px-4 py-3">School</th><th class="px-4 py-3">Type / Syllabus</th><th class="px-4 py-3">Participants</th><th class="px-4 py-3">Email</th><th class="px-4 py-3 text-right">Actions</th></tr>
+      <tr><th class="px-4 py-3">Code</th><th class="px-4 py-3">School</th><th class="px-4 py-3">Type / Syllabus</th><th class="px-4 py-3">Participants</th><th class="px-4 py-3">Email</th><th class="px-4 py-3 text-center">Last login</th><th class="px-4 py-3 text-right">Actions</th></tr>
     </thead>
     <tbody class="divide-y divide-gray-100">
-      <?php if (!$rows): ?><tr><td colspan="6" class="px-4 py-8 text-center text-gray-400">No schools found.</td></tr><?php endif; ?>
+      <?php if (!$rows): ?><tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">No schools found.</td></tr><?php endif; ?>
       <?php foreach ($rows as $r): ?>
         <tr>
           <td class="px-4 py-3 font-mono text-xs text-gray-600"><?= e($r['code']) ?></td>
@@ -332,6 +333,7 @@ require dirname(__DIR__) . '/includes/header.php';
           <td class="px-4 py-3 text-gray-600"><?= e($r['type_name'] ?: '—') ?><?= $r['syllabus_name'] ? '<br><span class="text-xs text-gray-400">' . e($r['syllabus_name']) . '</span>' : '' ?></td>
           <td class="px-4 py-3 text-gray-600"><?= e($r['participant1_name']) ?><?= $r['participant2_name'] ? '<br>' . e($r['participant2_name']) : '' ?></td>
           <td class="px-4 py-3 text-gray-600"><?= e($r['login_email']) ?></td>
+          <td class="px-4 py-3 text-center"><?= last_login_badge($r['last_login']) ?></td>
           <td class="px-4 py-3 text-right whitespace-nowrap">
             <button class="text-navy hover:underline mr-3" onclick='openEdit(<?= json_encode([
               "id"=>(int)$r["id"],"school_name"=>$r["name"],"email"=>$r["login_email"],"participant1_name"=>$r["participant1_name"],
