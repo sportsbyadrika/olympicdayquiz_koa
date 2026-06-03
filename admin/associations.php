@@ -280,7 +280,10 @@ $page = min($page, $pages);
 $offset = ($page - 1) * $perPage;
 
 $listStmt = db()->prepare(
-    'SELECT a.*, u.email, u.status FROM associations a JOIN users u ON u.id = a.user_id'
+    "SELECT a.*, u.email, u.status, ll.last_login
+     FROM associations a
+     JOIN users u ON u.id = a.user_id
+     LEFT JOIN (SELECT user_id, MAX(created_at) AS last_login FROM audit_log WHERE action='login_success' GROUP BY user_id) ll ON ll.user_id = u.id"
     . $where . " ORDER BY a.name LIMIT $perPage OFFSET $offset"
 );
 $listStmt->execute($listParams);
@@ -325,12 +328,13 @@ require dirname(__DIR__) . '/includes/header.php';
         <th class="px-4 py-3">Email</th>
         <th class="px-4 py-3">Contact</th>
         <th class="px-4 py-3">Conductor</th>
+        <th class="px-4 py-3 text-center">Last login</th>
         <th class="px-4 py-3 text-right">Actions</th>
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-100">
       <?php if (!$rows): ?>
-        <tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">No associations yet.</td></tr>
+        <tr><td colspan="6" class="px-4 py-8 text-center text-gray-400">No associations yet.</td></tr>
       <?php endif; ?>
       <?php foreach ($rows as $r): ?>
         <tr>
@@ -349,6 +353,7 @@ require dirname(__DIR__) . '/includes/header.php';
               </form>
             <?php endif; ?>
           </td>
+          <td class="px-4 py-3 text-center"><?= last_login_badge($r['last_login']) ?></td>
           <td class="px-4 py-3 text-right whitespace-nowrap">
             <div class="inline-flex items-center gap-3">
               <button title="Edit" class="text-navy hover:opacity-70"

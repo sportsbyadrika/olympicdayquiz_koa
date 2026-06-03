@@ -261,6 +261,23 @@ function paginate_links(int $page, int $pages): string
     return $out;
 }
 
+/**
+ * Render a compact last-login indicator: a green check if the user has logged
+ * in (with the date/time as a hover tooltip), or a red cross if never.
+ */
+function last_login_badge(?string $dt): string
+{
+    if ($dt) {
+        $when = date('d M Y, H:i', strtotime($dt));
+        return '<span title="Last login: ' . e($when) . '" class="inline-flex text-green-600 cursor-default">'
+            . '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
+            . '</span>';
+    }
+    return '<span title="Never logged in" class="inline-flex text-red-500 cursor-default">'
+        . '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
+        . '</span>';
+}
+
 /** Render a small status badge. */
 function status_badge(string $status): string
 {
