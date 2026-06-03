@@ -51,6 +51,7 @@ function read_question_input(): array
         if (mb_strlen($data["option_{$o}"]) > 500) $errors[] = 'Option ' . strtoupper($o) . ' exceeds 500 characters.';
     }
     if (!in_array($data['correct_option'], ['A', 'B', 'C', 'D'], true)) $errors[] = 'Select exactly one correct option.';
-    if (!in_array($data['difficulty'], ['Easy', 'Medium', 'Hard'], true)) $data['difficulty'] = 'Medium';
+    if (!in_array($data['difficulty'], ['Easy', 'Medium', 'Hard'], true)) $errors[] = 'Difficulty is required.';
+    if ($data['sport'] === '') $errors[] = 'Sport is required.';
     return [$data, $errors];
 }
