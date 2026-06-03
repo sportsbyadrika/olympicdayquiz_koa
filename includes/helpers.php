@@ -78,6 +78,25 @@ function app_url(string $path = ''): string
     return $scheme . '://' . $host . BASE_URL . $path;
 }
 
+/** Email login credentials (email + new password) to a user. Returns true if sent. */
+function email_login_credentials(string $toEmail, string $toName, string $password): bool
+{
+    $loginUrl = app_url('/public/login.php');
+    $subject = 'Your login & password — Olympic Day Quiz 2026';
+    $html = '<div style="font-family:Arial,sans-serif;color:#333">'
+        . '<h2 style="color:#1A2B49">Olympic Day Celebrations 2026 — Sports Quiz</h2>'
+        . '<p>Dear ' . e($toName) . ',</p>'
+        . '<p>Your login credentials have been (re)set:</p>'
+        . '<table style="border-collapse:collapse">'
+        . '<tr><td style="padding:4px 12px 4px 0"><b>Login URL</b></td><td><a href="' . e($loginUrl) . '">' . e($loginUrl) . '</a></td></tr>'
+        . '<tr><td style="padding:4px 12px 4px 0"><b>Email</b></td><td>' . e($toEmail) . '</td></tr>'
+        . '<tr><td style="padding:4px 12px 4px 0"><b>Password</b></td><td>' . e($password) . '</td></tr>'
+        . '</table>'
+        . '<p style="color:#888;font-size:12px">For security, please change your password after logging in (My Account).</p>'
+        . '</div>';
+    return send_email($toEmail, $toName, $subject, $html);
+}
+
 /**
  * Best-effort region/location for an IP address using a free geolocation API.
  * Returns a short "City, Region, Country" string, or null when unavailable
