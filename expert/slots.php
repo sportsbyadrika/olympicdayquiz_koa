@@ -176,13 +176,29 @@ if ($openSlotId):
         $a = db()->prepare('SELECT s.* FROM slot_schools ss JOIN schools s ON s.id=ss.school_id WHERE ss.slot_id=? ORDER BY s.name');
         $a->execute([$openSlotId]);
         $assigned = $a->fetchAll();
-        // Schools available (not already in another slot of this round)
-        $av = db()->prepare(
-            'SELECT s.* FROM schools s WHERE s.id NOT IN (
-                SELECT ss.school_id FROM slot_schools ss JOIN slots sl ON sl.id=ss.slot_id WHERE sl.round_id=?
-             ) ORDER BY s.name'
-        );
-        $av->execute([(int) $slot['round_id']]);
+        // Schools available (not already in another slot of this round). For
+        // Round 2, restrict to teams qualified from Round 1.
+        $roundNo = (int) $slot['round_no'];
+        if ($roundNo === 2) {
+            $r1 = db()->prepare('SELECT id FROM rounds WHERE round_no=1');
+            $r1->execute();
+            $round1Id = (int) $r1->fetchColumn();
+            $av = db()->prepare(
+                'SELECT s.* FROM schools s
+                 JOIN results res ON res.school_id = s.id AND res.round_id = ? AND res.qualified_for_next = 1
+                 WHERE s.id NOT IN (
+                    SELECT ss.school_id FROM slot_schools ss JOIN slots sl ON sl.id=ss.slot_id WHERE sl.round_id=?
+                 ) ORDER BY s.name'
+            );
+            $av->execute([$round1Id, (int) $slot['round_id']]);
+        } else {
+            $av = db()->prepare(
+                'SELECT s.* FROM schools s WHERE s.id NOT IN (
+                    SELECT ss.school_id FROM slot_schools ss JOIN slots sl ON sl.id=ss.slot_id WHERE sl.round_id=?
+                 ) ORDER BY s.name'
+            );
+            $av->execute([(int) $slot['round_id']]);
+        }
         $available = $av->fetchAll();
 ?>
 <div id="assign" class="bg-white rounded-xl border border-teal shadow-sm p-5 mt-2 scroll-mt-20">
