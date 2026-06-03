@@ -38,10 +38,19 @@ Olympic Day Celebrations 2026 Sports Quiz Competition.
    mysql -u root -p -e "CREATE DATABASE olympicday_quiz CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
    mysql -u root -p olympicday_quiz < database/schema.sql
    ```
-2. **Configure connection** via environment variables (or edit `config/db.php`):
-   `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`.
-3. **Configure mail** via `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`,
-   `SMTP_FROM` (see `config/mail.php`).
+2. **Configure credentials.** Copy `config/local.example.php` to
+   `config/local.php` and fill in DB + SMTP settings. `config/local.php` is
+   gitignored and is **not** deployed by `.cpanel.yml`, so it survives every
+   `git pull` / cPanel deploy. (Environment variables and built-in defaults are
+   used as fallbacks if `local.php` is absent.)
+3. **Mail** settings live in the `mail` section of `config/local.php` (or the
+   `SMTP_*` environment variables).
+
+### Applying schema changes to an existing database
+
+Fresh installs get everything from `database/schema.sql`. For a database created
+from an earlier schema, run the files in `database/migrations/` once (in date
+order), e.g. `2026_06_profile_fields.sql`, `2026_06_password_resets.sql`.
 4. **Serve** the app. For a quick dev server:
    ```bash
    php -S localhost:8000

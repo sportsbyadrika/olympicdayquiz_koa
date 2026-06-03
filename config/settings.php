@@ -11,11 +11,13 @@ define('APP_NAME', 'Olympic Day Celebrations 2026 — Sports Quiz Competition');
 define('APP_SHORT_NAME', 'Olympic Day Quiz 2026');
 define('APP_ORG', 'Kerala Olympic Association');
 
+require_once __DIR__ . '/env.php';
+
 // Environment: 'development' or 'production'
-define('APP_ENV', getenv('APP_ENV') ?: 'development');
+define('APP_ENV', cfg(null, 'app_env', 'APP_ENV', 'development'));
 
 // Base URL path (adjust if app is served from a subfolder)
-define('BASE_URL', rtrim(getenv('BASE_URL') ?: '', '/'));
+define('BASE_URL', rtrim((string) cfg(null, 'base_url', 'BASE_URL', ''), '/'));
 
 // Timezone — competition is conducted in India
 date_default_timezone_set('Asia/Kolkata');

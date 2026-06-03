@@ -1,4 +1,4 @@
-name,email,contact_person,contact_phone
-Kerala Football Association,kfa@example.test,Rajan Menon,9000000101
-Kerala Swimming Association,ksa@example.test,Priya Nair,9000000102
-Kerala Basketball Association,kba@example.test,Thomas Kurian,9000000103
+name,email,contact_person,contact_phone,district,address
+Kerala Football Association,kfa@example.test,Rajan Menon,9000000101,Ernakulam,"Kaloor, Kochi"
+Kerala Swimming Association,ksa@example.test,Priya Nair,9000000102,Thiruvananthapuram,"Pattom, TVM"
+Kerala Basketball Association,kba@example.test,Thomas Kurian,9000000103,Thrissur,"Round North, Thrissur"

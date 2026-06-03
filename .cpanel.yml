@@ -9,6 +9,12 @@ deployment:
     # Note: database/, the *.md docs and the .git metadata are intentionally
     # NOT copied to the web root. Import database/schema.sql from the repository
     # path instead, keeping the schema out of the public directory.
+    #
+    # Credentials live in config/local.php on the server. That file is gitignored
+    # (never in the repo) so it is NOT part of this deploy and is preserved across
+    # pulls/deploys. The committed config/*.php only contain generic loaders, so
+    # copying them below never clobbers your real settings. Create local.php once
+    # from config/local.example.php.
 
     - export DEPLOYPATH=/home/olympicd/public_html
     - /bin/mkdir -p $DEPLOYPATH

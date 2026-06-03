@@ -70,6 +70,52 @@ function client_ip(): string
     return $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
 }
 
+/** Build an absolute URL to an app path (e.g. '/public/login.php'). */
+function app_url(string $path = ''): string
+{
+    $scheme = COOKIE_SECURE ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    return $scheme . '://' . $host . BASE_URL . $path;
+}
+
+/**
+ * Best-effort region/location for an IP address using a free geolocation API.
+ * Returns a short "City, Region, Country" string, or null when unavailable
+ * (private/reserved IPs, no network, or lookup failure). Cached per request.
+ */
+function ip_region(?string $ip): ?string
+{
+    static $cache = [];
+    $ip = (string) $ip;
+    if ($ip === '' || array_key_exists($ip, $cache)) {
+        return $cache[$ip] ?? null;
+    }
+    // Skip private/reserved addresses — no meaningful geo data.
+    if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+        return $cache[$ip] = null;
+    }
+    if (!function_exists('curl_init')) {
+        return $cache[$ip] = null;
+    }
+    $ch = curl_init('http://ip-api.com/json/' . urlencode($ip) . '?fields=status,country,regionName,city');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 2,
+        CURLOPT_CONNECTTIMEOUT => 2,
+    ]);
+    $body = curl_exec($ch);
+    curl_close($ch);
+    if (!$body) {
+        return $cache[$ip] = null;
+    }
+    $data = json_decode($body, true);
+    if (!is_array($data) || ($data['status'] ?? '') !== 'success') {
+        return $cache[$ip] = null;
+    }
+    $parts = array_filter([$data['city'] ?? '', $data['regionName'] ?? '', $data['country'] ?? '']);
+    return $cache[$ip] = $parts ? implode(', ', $parts) : null;
+}
+
 /** Write an entry to the audit log. */
 function audit_log(string $action, ?string $entity = null, $entityId = null, ?string $details = null): void
 {
