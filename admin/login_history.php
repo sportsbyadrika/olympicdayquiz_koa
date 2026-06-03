@@ -49,9 +49,13 @@ $page = min($page, $pages);
 $offset = ($page - 1) * $perPage;
 
 $stmt = db()->prepare(
-    "SELECT al.created_at, al.action, al.ip, al.user_agent, al.details, u.email AS user_email
+    "SELECT al.created_at, al.action, al.ip, al.user_agent, al.details,
+            u.role AS user_role, u.email AS user_email,
+            COALESCE(a.name, sc.name) AS institution
      FROM audit_log al
      LEFT JOIN users u ON u.id = al.user_id
+     LEFT JOIN associations a ON a.user_id = u.id
+     LEFT JOIN schools sc ON sc.user_id = u.id
      WHERE $where
      ORDER BY al.created_at DESC LIMIT $perPage OFFSET $offset"
 );
@@ -115,6 +119,8 @@ require dirname(__DIR__) . '/includes/header.php';
       <tr>
         <th class="px-4 py-3">Date / Time</th>
         <th class="px-4 py-3">Email</th>
+        <th class="px-4 py-3">Role</th>
+        <th class="px-4 py-3">Institution</th>
         <th class="px-4 py-3">Result</th>
         <th class="px-4 py-3">IP address</th>
         <?php if ($showRegion): ?><th class="px-4 py-3">Region</th><?php endif; ?>
@@ -122,7 +128,7 @@ require dirname(__DIR__) . '/includes/header.php';
     </thead>
     <tbody class="divide-y divide-gray-100">
       <?php if (!$rows): ?>
-        <tr><td colspan="<?= $showRegion ? 5 : 4 ?>" class="px-4 py-8 text-center text-gray-400">No login activity in this range.</td></tr>
+        <tr><td colspan="<?= $showRegion ? 7 : 6 ?>" class="px-4 py-8 text-center text-gray-400">No login activity in this range.</td></tr>
       <?php endif; ?>
       <?php foreach ($rows as $r):
         $ok = $r['action'] === 'login_success';
@@ -130,6 +136,8 @@ require dirname(__DIR__) . '/includes/header.php';
         <tr>
           <td class="px-4 py-3 text-gray-600 whitespace-nowrap"><?= e(date('d M Y, H:i:s', strtotime((string)$r['created_at']))) ?></td>
           <td class="px-4 py-3 font-medium text-navy"><?= e(row_email($r)) ?></td>
+          <td class="px-4 py-3 text-gray-600"><?= $r['user_role'] ? e(ucfirst($r['user_role'])) : '—' ?></td>
+          <td class="px-4 py-3 text-gray-600"><?= !empty($r['institution']) ? e($r['institution']) : '—' ?></td>
           <td class="px-4 py-3">
             <?php if ($ok): ?>
               <span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Success</span>
