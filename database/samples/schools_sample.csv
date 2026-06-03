@@ -1,4 +1,4 @@
-school_name,school_code,email,participant1_name,participant2_name,address,contact
-Holy Family HSS,SCH101,hf101@example.test,Anu Raj,Biju Thomas,"Ernakulam, Kerala",9000000201
-Sacred Heart HSS,SCH102,sh102@example.test,Christy John,Deepa Mol,"Thrissur, Kerala",9000000202
-Govt Boys HSS,SCH103,gb103@example.test,Eldho Paul,Fathima Beevi,"Kozhikode, Kerala",9000000203
+school_name,school_code,email,participant1_name,participant2_name,address,contact,contact_person,school_type,syllabus
+Holy Family HSS,SCH101,hf101@example.test,Anu Raj,Biju Thomas,"Ernakulam, Kerala",9000000201,Sr. Maria,Aided,State
+Sacred Heart HSS,SCH102,sh102@example.test,Christy John,Deepa Mol,"Thrissur, Kerala",9000000202,Fr. Joseph,Private,CBSE
+Govt Boys HSS,SCH103,gb103@example.test,Eldho Paul,Fathima Beevi,"Kozhikode, Kerala",9000000203,Headmaster,Government,State

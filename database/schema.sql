@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS associations (
   contact_person     VARCHAR(190) DEFAULT NULL,
   contact_email      VARCHAR(190) DEFAULT NULL,
   contact_phone      VARCHAR(40)  DEFAULT NULL,
+  district           VARCHAR(190) DEFAULT NULL,
+  address            VARCHAR(500) DEFAULT NULL,
   is_event_conductor TINYINT(1) NOT NULL DEFAULT 0,
   created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -40,6 +42,28 @@ CREATE TABLE IF NOT EXISTS associations (
   UNIQUE KEY uq_assoc_user (user_id),
   KEY idx_assoc_conductor (is_event_conductor),
   CONSTRAINT fk_assoc_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------
+-- school_types : master lookup (Government, Aided, Private, …)
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS school_types (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name       VARCHAR(100) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_school_type_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------
+-- syllabi : master lookup (State, CBSE, ICSE, …)
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS syllabi (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name       VARCHAR(100) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_syllabus_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------
@@ -53,15 +77,22 @@ CREATE TABLE IF NOT EXISTS schools (
   email             VARCHAR(190) DEFAULT NULL,
   participant1_name VARCHAR(190) DEFAULT NULL,
   participant2_name VARCHAR(190) DEFAULT NULL,
+  contact_person    VARCHAR(190) DEFAULT NULL,
   address           VARCHAR(500) DEFAULT NULL,
   contact           VARCHAR(60)  DEFAULT NULL,
+  school_type_id    INT UNSIGNED DEFAULT NULL,
+  syllabus_id       INT UNSIGNED DEFAULT NULL,
   created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_school_user (user_id),
   UNIQUE KEY uq_school_code (code),
   KEY idx_school_name (name),
-  CONSTRAINT fk_school_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  KEY idx_school_type (school_type_id),
+  KEY idx_school_syllabus (syllabus_id),
+  CONSTRAINT fk_school_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_school_type FOREIGN KEY (school_type_id) REFERENCES school_types(id) ON DELETE SET NULL,
+  CONSTRAINT fk_school_syllabus FOREIGN KEY (syllabus_id) REFERENCES syllabi(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------
@@ -73,6 +104,7 @@ CREATE TABLE IF NOT EXISTS experts (
   name       VARCHAR(190) NOT NULL,
   email      VARCHAR(190) DEFAULT NULL,
   phone      VARCHAR(40)  DEFAULT NULL,
+  details    TEXT DEFAULT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -338,6 +370,13 @@ SET @seed_hash = '$2y$12$u4TANWFamXKx0nNLHCe35Ox/q6IYqWI.ALuFrl5szd4kCewf.quja';
 INSERT INTO rounds (round_no, name) VALUES
   (1, 'Round 1'),
   (2, 'Round 2')
+ON DUPLICATE KEY UPDATE name = VALUES(name);
+
+-- Master lookups
+INSERT INTO school_types (name) VALUES ('Government'), ('Aided'), ('Private')
+ON DUPLICATE KEY UPDATE name = VALUES(name);
+
+INSERT INTO syllabi (name) VALUES ('State'), ('CBSE'), ('ICSE'), ('Other')
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
 -- Default settings

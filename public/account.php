@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/includes/auth.php';
 require_once dirname(__DIR__) . '/includes/users.php';
+require_once dirname(__DIR__) . '/includes/lookups.php';
 require_login();
 
 $uid = current_user_id();
@@ -74,6 +75,8 @@ function profile_rows(string $role, array $user, ?array $profile): array
                 ['Association name', $profile['name'] ?? ''],
                 ['Contact person', $profile['contact_person'] ?? ''],
                 ['Contact phone', $profile['contact_phone'] ?? ''],
+                ['District (office)', $profile['district'] ?? ''],
+                ['Address', $profile['address'] ?? ''],
                 ['Event conductor', ((int) ($profile['is_event_conductor'] ?? 0) === 1) ? 'Yes' : 'No'],
             ];
             break;
@@ -81,16 +84,22 @@ function profile_rows(string $role, array $user, ?array $profile): array
             $extra = [
                 ['Name', $profile['name'] ?? ''],
                 ['Phone', $profile['phone'] ?? ''],
+                ['Details', $profile['details'] ?? ''],
             ];
             break;
         case 'school':
+            $types = lookup_map('school_types');
+            $syl = lookup_map('syllabi');
             $extra = [
                 ['School name', $profile['name'] ?? ''],
                 ['School code', $profile['code'] ?? ''],
+                ['School type', $types[(int) ($profile['school_type_id'] ?? 0)] ?? ''],
+                ['Syllabus', $syl[(int) ($profile['syllabus_id'] ?? 0)] ?? ''],
                 ['Participant 1', $profile['participant1_name'] ?? ''],
                 ['Participant 2', $profile['participant2_name'] ?? ''],
-                ['Address', $profile['address'] ?? ''],
+                ['Contact person', $profile['contact_person'] ?? ''],
                 ['Contact', $profile['contact'] ?? ''],
+                ['Address', $profile['address'] ?? ''],
             ];
             break;
         default:

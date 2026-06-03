@@ -39,6 +39,16 @@ function create_user(string $email, string $plainPassword, string $role, string 
     return (int) db()->lastInsertId();
 }
 
+/** Update a user's login email. Returns false if the email is taken. */
+function update_user_email(int $userId, string $email): bool
+{
+    if (email_exists($email, $userId)) {
+        return false;
+    }
+    db()->prepare('UPDATE users SET email = :e WHERE id = :id')->execute([':e' => $email, ':id' => $userId]);
+    return true;
+}
+
 /** Update a user's password (bcrypt). */
 function set_user_password(int $userId, string $plainPassword): void
 {

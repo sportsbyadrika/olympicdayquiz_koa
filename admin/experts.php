@@ -14,6 +14,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         $name = post('name');
         $email = strtolower(post('email'));
         $phone = post('phone');
+        $details = post('details');
         $errors = [];
         if ($name === '')             $errors[] = 'Name is required.';
         if (!is_email($email))        $errors[] = 'A valid email is required.';
@@ -27,8 +28,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             try {
                 $password = generate_password();
                 $uid = create_user($email, $password, 'expert');
-                $stmt = $pdo->prepare('INSERT INTO experts (user_id, name, email, phone) VALUES (:uid,:n,:e,:p)');
-                $stmt->execute([':uid' => $uid, ':n' => $name, ':e' => $email, ':p' => $phone]);
+                $stmt = $pdo->prepare('INSERT INTO experts (user_id, name, email, phone, details) VALUES (:uid,:n,:e,:p,:d)');
+                $stmt->execute([':uid' => $uid, ':n' => $name, ':e' => $email, ':p' => $phone, ':d' => $details]);
                 $pdo->commit();
                 audit_log('expert_create', 'experts', (int) $pdo->lastInsertId());
                 flash('success', "Expert created. Temporary password: {$password}");
@@ -43,10 +44,26 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     if ($action === 'update') {
         $id = int_val(post('id'));
         $name = post('name');
+        $email = strtolower(post('email'));
         $phone = post('phone');
-        if ($id && $name !== '') {
-            db()->prepare('UPDATE experts SET name=:n, phone=:p WHERE id=:id')
-                ->execute([':n' => $name, ':p' => $phone, ':id' => $id]);
+        $details = post('details');
+
+        $u = db()->prepare('SELECT user_id FROM experts WHERE id=:id');
+        $u->execute([':id' => $id]);
+        $userId = (int) $u->fetchColumn();
+
+        $errors = [];
+        if (!$id || $userId === 0) $errors[] = 'Expert not found.';
+        if ($name === '')          $errors[] = 'Name is required.';
+        if (!is_email($email))     $errors[] = 'A valid email is required.';
+        elseif (email_exists($email, $userId)) $errors[] = 'That email is already in use.';
+
+        if ($errors) {
+            flash('error', implode(' ', $errors));
+        } else {
+            update_user_email($userId, $email);
+            db()->prepare('UPDATE experts SET name=:n, email=:e, phone=:p, details=:d WHERE id=:id')
+                ->execute([':n' => $name, ':e' => $email, ':p' => $phone, ':d' => $details, ':id' => $id]);
             audit_log('expert_update', 'experts', $id);
             flash('success', 'Expert updated.');
         }
@@ -92,7 +109,7 @@ require dirname(__DIR__) . '/includes/header.php';
           <td class="px-4 py-3 text-gray-600"><?= e($r['email']) ?></td>
           <td class="px-4 py-3 text-gray-600"><?= e($r['phone']) ?></td>
           <td class="px-4 py-3 text-right whitespace-nowrap">
-            <button class="text-navy hover:underline mr-3" onclick='openEdit(<?= json_encode(["id"=>(int)$r["id"],"name"=>$r["name"],"phone"=>$r["phone"]], JSON_HEX_APOS|JSON_HEX_QUOT) ?>)'>Edit</button>
+            <button class="text-navy hover:underline mr-3" onclick='openEdit(<?= json_encode(["id"=>(int)$r["id"],"name"=>$r["name"],"email"=>$r["email"],"phone"=>$r["phone"],"details"=>$r["details"]], JSON_HEX_APOS|JSON_HEX_QUOT) ?>)'>Edit</button>
             <form method="post" class="inline" onsubmit="return confirm('Delete this expert and login?');">
               <?= csrf_field() ?>
               <input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
@@ -116,7 +133,9 @@ require dirname(__DIR__) . '/includes/header.php';
       <label class="block text-sm font-medium mb-1">Login email *</label>
       <input name="email" type="email" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-3">
       <label class="block text-sm font-medium mb-1">Phone</label>
-      <input name="phone" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-4">
+      <input name="phone" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-3">
+      <label class="block text-sm font-medium mb-1">Details</label>
+      <textarea name="details" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-4" placeholder="Areas of expertise, notes, etc."></textarea>
       <div class="flex justify-end gap-2">
         <button type="button" onclick="document.getElementById('createModal').classList.add('hidden')" class="px-4 py-2 rounded-lg border border-gray-300">Cancel</button>
         <button class="px-4 py-2 rounded-lg bg-navy text-white font-medium">Create</button>
@@ -133,8 +152,12 @@ require dirname(__DIR__) . '/includes/header.php';
       <input type="hidden" name="action" value="update"><input type="hidden" name="id" id="edit_id">
       <label class="block text-sm font-medium mb-1">Name *</label>
       <input name="name" id="edit_name" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-3">
+      <label class="block text-sm font-medium mb-1">Login email *</label>
+      <input name="email" id="edit_email" type="email" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-3">
       <label class="block text-sm font-medium mb-1">Phone</label>
-      <input name="phone" id="edit_phone" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-4">
+      <input name="phone" id="edit_phone" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-3">
+      <label class="block text-sm font-medium mb-1">Details</label>
+      <textarea name="details" id="edit_details" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-4"></textarea>
       <div class="flex justify-end gap-2">
         <button type="button" onclick="document.getElementById('editModal').classList.add('hidden')" class="px-4 py-2 rounded-lg border border-gray-300">Cancel</button>
         <button class="px-4 py-2 rounded-lg bg-navy text-white font-medium">Save</button>
@@ -144,7 +167,7 @@ require dirname(__DIR__) . '/includes/header.php';
 </div>
 
 <script>
-  function openEdit(d){document.getElementById('edit_id').value=d.id;document.getElementById('edit_name').value=d.name||'';document.getElementById('edit_phone').value=d.phone||'';document.getElementById('editModal').classList.remove('hidden');}
+  function openEdit(d){document.getElementById('edit_id').value=d.id;document.getElementById('edit_name').value=d.name||'';document.getElementById('edit_email').value=d.email||'';document.getElementById('edit_phone').value=d.phone||'';document.getElementById('edit_details').value=d.details||'';document.getElementById('editModal').classList.remove('hidden');}
 </script>
 
 <?php require dirname(__DIR__) . '/includes/footer.php'; ?>
