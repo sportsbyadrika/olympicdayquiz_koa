@@ -79,6 +79,10 @@ $pageTitle = 'Login';
         Sign in
       </button>
     </form>
+
+    <div class="mt-4 text-center">
+      <a href="<?= e(BASE_URL) ?>/public/forgot_password.php" class="text-sm text-teal hover:underline">Forgot password?</a>
+    </div>
   </div>
 
   <a href="<?= e(BASE_URL) ?>/public/index.php" class="mt-6 text-sm text-gray-500 hover:text-navy">&larr; Back to home</a>

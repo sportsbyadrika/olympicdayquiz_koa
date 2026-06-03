@@ -27,6 +27,7 @@ function nav_links(?string $role): array
                 ['/admin/experts.php', 'Experts'],
                 ['/admin/schools.php', 'Schools'],
                 ['/admin/email_credentials.php', 'Email Credentials'],
+                ['/admin/login_history.php', 'Login History'],
                 ['/admin/settings.php', 'Settings'],
             ];
         case 'association':

@@ -6,6 +6,7 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/env.php';
 require_once __DIR__ . '/settings.php';
 
 function db(): PDO
@@ -15,11 +16,11 @@ function db(): PDO
         return $pdo;
     }
 
-    $host = getenv('DB_HOST') ?: '127.0.0.1';
-    $port = getenv('DB_PORT') ?: '3306';
-    $name = getenv('DB_NAME') ?: 'olympicday_quiz';
-    $user = getenv('DB_USER') ?: 'root';
-    $pass = getenv('DB_PASS') ?: '';
+    $host = cfg('db', 'host', 'DB_HOST', '127.0.0.1');
+    $port = cfg('db', 'port', 'DB_PORT', '3306');
+    $name = cfg('db', 'name', 'DB_NAME', 'olympicday_quiz');
+    $user = cfg('db', 'user', 'DB_USER', 'root');
+    $pass = cfg('db', 'pass', 'DB_PASS', '');
 
     $dsn = "mysql:host={$host};port={$port};dbname={$name};charset=utf8mb4";
 
