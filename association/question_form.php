@@ -109,50 +109,62 @@ require dirname(__DIR__) . '/includes/header.php';
   </div>
 <?php endif; ?>
 
-<form method="post" class="bg-white rounded-xl border border-gray-100 shadow-sm p-5 sm:p-6 max-w-3xl">
+<form method="post" class="max-w-6xl">
   <?= csrf_field() ?>
   <input type="hidden" name="question_id" value="<?= (int) $editId ?>">
 
-  <label class="block text-sm font-medium mb-1">Question text *</label>
-  <textarea name="question_text" required rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-4"><?= e($v['question_text']) ?></textarea>
+  <div class="grid lg:grid-cols-3 gap-6 items-start">
+    <!-- Main panel: question, options, correct answer, explanation -->
+    <div class="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm p-5 sm:p-6">
+      <label class="block text-sm font-medium mb-1">Question text *</label>
+      <textarea name="question_text" required rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-4"><?= e($v['question_text']) ?></textarea>
 
-  <div class="grid sm:grid-cols-2 gap-4">
-    <?php foreach (['a' => 'A', 'b' => 'B', 'c' => 'C', 'd' => 'D'] as $key => $L): ?>
-      <div>
-        <label class="block text-sm font-medium mb-1">Option <?= $L ?> *</label>
-        <textarea name="option_<?= $key ?>" required rows="2" maxlength="500" class="w-full border border-gray-300 rounded-lg px-3 py-2.5"><?= e($v['option_' . $key]) ?></textarea>
-      </div>
-    <?php endforeach; ?>
-  </div>
-
-  <div class="grid sm:grid-cols-2 gap-4 mt-4">
-    <div>
-      <label class="block text-sm font-medium mb-1">Correct option *</label>
-      <div class="flex gap-4 mt-2">
-        <?php foreach (['A', 'B', 'C', 'D'] as $c): ?>
-          <label class="flex items-center gap-1 text-sm"><input type="radio" name="correct_option" value="<?= $c ?>" <?= $v['correct_option'] === $c ? 'checked' : '' ?>> <?= $c ?></label>
+      <div class="grid sm:grid-cols-2 gap-4">
+        <?php foreach (['a' => 'A', 'b' => 'B', 'c' => 'C', 'd' => 'D'] as $key => $L): ?>
+          <div>
+            <label class="block text-sm font-medium mb-1">Option <?= $L ?> *</label>
+            <textarea name="option_<?= $key ?>" required rows="2" maxlength="500" class="w-full border border-gray-300 rounded-lg px-3 py-2.5"><?= e($v['option_' . $key]) ?></textarea>
+          </div>
         <?php endforeach; ?>
       </div>
+
+      <div class="mt-4">
+        <label class="block text-sm font-medium mb-1">Correct option *</label>
+        <div class="flex gap-5 mt-2">
+          <?php foreach (['A', 'B', 'C', 'D'] as $c): ?>
+            <label class="flex items-center gap-1 text-sm"><input type="radio" name="correct_option" value="<?= $c ?>" <?= $v['correct_option'] === $c ? 'checked' : '' ?>> <?= $c ?></label>
+          <?php endforeach; ?>
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <label class="block text-sm font-medium mb-1">Explanation</label>
+        <textarea name="explanation" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2.5"><?= e($v['explanation']) ?></textarea>
+        <p class="text-xs text-gray-500 mt-1">Shown to participants on the result screen after submission (not during the quiz).</p>
+      </div>
     </div>
-    <div>
-      <label class="block text-sm font-medium mb-1">Difficulty</label>
-      <select name="difficulty" class="w-full border border-gray-300 rounded-lg px-3 py-2.5">
-        <?php foreach (['Easy', 'Medium', 'Hard'] as $lvl): ?>
-          <option <?= $v['difficulty'] === $lvl ? 'selected' : '' ?>><?= $lvl ?></option>
-        <?php endforeach; ?>
-      </select>
-    </div>
-    <div><label class="block text-sm font-medium mb-1">Sport</label><input name="sport" value="<?= e($v['sport']) ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2.5"></div>
-    <div><label class="block text-sm font-medium mb-1">Category</label><input name="category" value="<?= e($v['category']) ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2.5"></div>
-    <div class="sm:col-span-2"><label class="block text-sm font-medium mb-1">Reference / Source</label><input name="reference_source" value="<?= e($v['reference_source']) ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2.5"></div>
-    <div class="sm:col-span-2">
-      <label class="block text-sm font-medium mb-1">Explanation</label>
-      <textarea name="explanation" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2.5"><?= e($v['explanation']) ?></textarea>
-      <p class="text-xs text-gray-500 mt-1">Shown to participants on the result screen after submission (not during the quiz).</p>
+
+    <!-- Side panel: classification details -->
+    <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5 sm:p-6 lg:sticky lg:top-20">
+      <h2 class="font-semibold text-navy mb-4">Details</h2>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">Difficulty</label>
+          <select name="difficulty" class="w-full border border-gray-300 rounded-lg px-3 py-2.5">
+            <?php foreach (['Easy', 'Medium', 'Hard'] as $lvl): ?>
+              <option <?= $v['difficulty'] === $lvl ? 'selected' : '' ?>><?= $lvl ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div><label class="block text-sm font-medium mb-1">Sport</label><input name="sport" value="<?= e($v['sport']) ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2.5"></div>
+        <div><label class="block text-sm font-medium mb-1">Category</label><input name="category" value="<?= e($v['category']) ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2.5"></div>
+        <div><label class="block text-sm font-medium mb-1">Reference / Source</label><input name="reference_source" value="<?= e($v['reference_source']) ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2.5"></div>
+      </div>
+      <p class="text-xs text-gray-400 mt-4">Sport, Category and Reference are optional but recommended.</p>
     </div>
   </div>
 
-  <div class="flex flex-wrap gap-2 mt-6">
+  <div class="flex flex-wrap gap-2 mt-6 max-w-6xl">
     <button type="submit" name="action" value="save" class="bg-navy text-white rounded-lg px-5 py-2.5 font-medium min-h-[44px]"><?= $isEdit ? 'Save Changes' : 'Save' ?></button>
     <?php if (!$isEdit): ?>
       <button type="submit" name="action" value="save_new" class="bg-teal text-white rounded-lg px-5 py-2.5 font-medium min-h-[44px]">Save &amp; Enter New Question</button>
