@@ -1,0 +1,24 @@
+---
+deployment:
+  tasks:
+    # cPanel runs these tasks from the repository path:
+    #   /home/olympicd/repositories/olympicdayquiz_koa
+    # and deploys the application into the public web root:
+    #   /home/olympicd/public_html
+    #
+    # Note: database/, the *.md docs and the .git metadata are intentionally
+    # NOT copied to the web root. Import database/schema.sql from the repository
+    # path instead, keeping the schema out of the public directory.
+
+    - export DEPLOYPATH=/home/olympicd/public_html
+    - /bin/mkdir -p $DEPLOYPATH
+
+    # Copy application code into the web root.
+    - /bin/cp -R ./index.php ./public ./admin ./association ./expert ./school ./api ./reports ./includes ./config $DEPLOYPATH/
+
+    # Ensure the uploads directory exists and stays protected, without
+    # clobbering any files schools/admins have already uploaded.
+    - /bin/mkdir -p $DEPLOYPATH/uploads
+    - /bin/cp -f ./uploads/.htaccess $DEPLOYPATH/uploads/.htaccess
+
+    - echo "Deployment to $DEPLOYPATH complete."
