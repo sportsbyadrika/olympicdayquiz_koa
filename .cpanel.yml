@@ -10,17 +10,21 @@ deployment:
     # NOT copied to the web root. Import database/schema.sql from the repository
     # path instead, keeping the schema out of the public directory.
     #
-    # Credentials live in config/local.php on the server. That file is gitignored
-    # (never in the repo) so it is NOT part of this deploy and is preserved across
-    # pulls/deploys. The committed config/*.php only contain generic loaders, so
-    # copying them below never clobbers your real settings. Create local.php once
-    # from config/local.example.php.
+    # CONFIG IS NEVER OVERWRITTEN. Everything under /config is copied with
+    # "cp -n" (no-clobber): files are installed on the first deploy, but any
+    # later deploy leaves your edited config/*.php (db.php, settings.php,
+    # mail.php) and config/local.php untouched. To pull a new version of a
+    # config file from the repo, delete that file on the server and redeploy.
 
     - export DEPLOYPATH=/home/olympicd/public_html
     - /bin/mkdir -p $DEPLOYPATH
 
-    # Copy application code into the web root.
-    - /bin/cp -R ./index.php ./public ./admin ./association ./expert ./school ./api ./reports ./includes ./config $DEPLOYPATH/
+    # Application code — overwritten every deploy (config is handled separately).
+    - /bin/cp -R ./index.php ./public ./admin ./association ./expert ./school ./api ./reports ./includes $DEPLOYPATH/
+
+    # Config — install once, never clobber existing files on the server.
+    - /bin/mkdir -p $DEPLOYPATH/config
+    - /bin/cp -Rn ./config/. $DEPLOYPATH/config/
 
     # Ensure the uploads directory exists and stays protected, without
     # clobbering any files schools/admins have already uploaded.
