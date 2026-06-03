@@ -1,0 +1,21 @@
+# Dependencies
+/vendor/
+/node_modules/
+
+# Environment / secrets
+.env
+.env.*
+config/local.php
+
+# Uploaded CSV files (keep the folder, ignore contents)
+/uploads/*
+!/uploads/.gitkeep
+!/uploads/.htaccess
+
+# Build artifacts
+/public/assets/css/app.build.css
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
