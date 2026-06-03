@@ -34,6 +34,7 @@ function nav_links(?string $role): array
             return [
                 ['/association/index.php', 'Dashboard'],
                 ['/association/question_bank.php', 'My Question Bank'],
+                ['/association/submissions.php', 'My Submissions'],
             ];
         case 'expert':
             return [
