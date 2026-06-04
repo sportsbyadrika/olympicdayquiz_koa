@@ -428,32 +428,30 @@ require dirname(__DIR__) . '/includes/header.php';
 
 <!-- Create modal -->
 <div id="createModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-start justify-center p-4 overflow-y-auto">
-  <div class="bg-white rounded-2xl w-full max-w-md p-6 my-8">
+  <div class="bg-white rounded-2xl w-full max-w-2xl p-6 my-8">
     <h2 class="text-lg font-bold text-navy mb-4">Add Association</h2>
     <form method="post">
       <?= csrf_field() ?>
       <input type="hidden" name="action" value="create">
-      <label class="block text-sm font-medium mb-1">Association name *</label>
-      <input name="name" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-3">
-      <label class="block text-sm font-medium mb-1">Login email *</label>
-      <input name="email" type="email" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-3">
-      <label class="block text-sm font-medium mb-1">Contact person</label>
-      <input name="contact_person" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-3">
-      <label class="block text-sm font-medium mb-1">Contact phone</label>
-      <input name="contact_phone" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-3">
-      <label class="block text-sm font-medium mb-1">District (association office)</label>
-      <input name="district" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-3">
-      <label class="block text-sm font-medium mb-1">Address</label>
-      <textarea name="address" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-3"></textarea>
-      <label class="block text-sm font-medium mb-1">Sport(s) managed</label>
-      <select name="sport_ids[]" id="create_sports" multiple size="6" class="w-full border border-gray-300 rounded-lg px-3 py-2 mb-1">
-        <?php foreach ($sports as $sid => $sname): ?><option value="<?= (int)$sid ?>"><?= e($sname) ?></option><?php endforeach; ?>
-      </select>
-      <p class="text-xs text-gray-400 mb-3">Hold Ctrl (Cmd on Mac) to select multiple.</p>
-      <label class="flex items-center gap-2 mb-4 text-sm">
-        <input type="checkbox" name="is_event_conductor" value="1" class="rounded"> Mark as Event Conducting Association
-      </label>
-      <div class="flex justify-end gap-2">
+      <div class="grid sm:grid-cols-2 gap-x-4 gap-y-3">
+        <div><label class="block text-sm font-medium mb-1">Association name *</label><input name="name" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5"></div>
+        <div><label class="block text-sm font-medium mb-1">Login email *</label><input name="email" type="email" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5"></div>
+        <div><label class="block text-sm font-medium mb-1">Contact person</label><input name="contact_person" class="w-full border border-gray-300 rounded-lg px-3 py-2.5"></div>
+        <div><label class="block text-sm font-medium mb-1">Contact phone</label><input name="contact_phone" class="w-full border border-gray-300 rounded-lg px-3 py-2.5"></div>
+        <div><label class="block text-sm font-medium mb-1">District (association office)</label><input name="district" class="w-full border border-gray-300 rounded-lg px-3 py-2.5"></div>
+        <div><label class="block text-sm font-medium mb-1">Address</label><input name="address" class="w-full border border-gray-300 rounded-lg px-3 py-2.5"></div>
+        <div class="sm:col-span-2">
+          <label class="block text-sm font-medium mb-1">Sport(s) managed</label>
+          <select name="sport_ids[]" id="create_sports" multiple size="5" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+            <?php foreach ($sports as $sid => $sname): ?><option value="<?= (int)$sid ?>"><?= e($sname) ?></option><?php endforeach; ?>
+          </select>
+          <p class="text-xs text-gray-400 mt-1">Hold Ctrl (Cmd on Mac) to select multiple.</p>
+        </div>
+        <label class="sm:col-span-2 flex items-center gap-2 text-sm">
+          <input type="checkbox" name="is_event_conductor" value="1" class="rounded"> Mark as Event Conducting Association
+        </label>
+      </div>
+      <div class="flex justify-end gap-2 mt-5">
         <button type="button" onclick="document.getElementById('createModal').classList.add('hidden')" class="px-4 py-2 rounded-lg border border-gray-300">Cancel</button>
         <button class="px-4 py-2 rounded-lg bg-navy text-white font-medium">Create</button>
       </div>
@@ -463,36 +461,35 @@ require dirname(__DIR__) . '/includes/header.php';
 
 <!-- Edit modal -->
 <div id="editModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-start justify-center p-4 overflow-y-auto">
-  <div class="bg-white rounded-2xl w-full max-w-md p-6 my-8">
+  <div class="bg-white rounded-2xl w-full max-w-2xl p-6 my-8">
     <h2 class="text-lg font-bold text-navy mb-4">Edit Association</h2>
     <form method="post">
       <?= csrf_field() ?>
       <input type="hidden" name="action" value="update">
       <input type="hidden" name="id" id="edit_id">
-      <label class="block text-sm font-medium mb-1">Association name *</label>
-      <input name="name" id="edit_name" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-3">
-      <label class="block text-sm font-medium mb-1">Login email *</label>
-      <input name="email" id="edit_email" type="email" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-3">
-      <label class="block text-sm font-medium mb-1">Contact person</label>
-      <input name="contact_person" id="edit_person" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-3">
-      <label class="block text-sm font-medium mb-1">Contact phone</label>
-      <input name="contact_phone" id="edit_phone" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-3">
-      <label class="block text-sm font-medium mb-1">District (association office)</label>
-      <input name="district" id="edit_district" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-3">
-      <label class="block text-sm font-medium mb-1">Address</label>
-      <textarea name="address" id="edit_address" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-3"></textarea>
-      <label class="block text-sm font-medium mb-1">Sport(s) managed</label>
-      <select name="sport_ids[]" id="edit_sports" multiple size="6" class="w-full border border-gray-300 rounded-lg px-3 py-2 mb-1">
-        <?php foreach ($sports as $sid => $sname): ?><option value="<?= (int)$sid ?>"><?= e($sname) ?></option><?php endforeach; ?>
-      </select>
-      <p class="text-xs text-gray-400 mb-4">Hold Ctrl (Cmd on Mac) to select multiple.</p>
-      <div class="flex justify-end gap-2">
+      <div class="grid sm:grid-cols-2 gap-x-4 gap-y-3">
+        <div><label class="block text-sm font-medium mb-1">Association name *</label><input name="name" id="edit_name" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5"></div>
+        <div><label class="block text-sm font-medium mb-1">Login email *</label><input name="email" id="edit_email" type="email" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5"></div>
+        <div><label class="block text-sm font-medium mb-1">Contact person</label><input name="contact_person" id="edit_person" class="w-full border border-gray-300 rounded-lg px-3 py-2.5"></div>
+        <div><label class="block text-sm font-medium mb-1">Contact phone</label><input name="contact_phone" id="edit_phone" class="w-full border border-gray-300 rounded-lg px-3 py-2.5"></div>
+        <div><label class="block text-sm font-medium mb-1">District (association office)</label><input name="district" id="edit_district" class="w-full border border-gray-300 rounded-lg px-3 py-2.5"></div>
+        <div><label class="block text-sm font-medium mb-1">Address</label><input name="address" id="edit_address" class="w-full border border-gray-300 rounded-lg px-3 py-2.5"></div>
+        <div class="sm:col-span-2">
+          <label class="block text-sm font-medium mb-1">Sport(s) managed</label>
+          <select name="sport_ids[]" id="edit_sports" multiple size="5" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+            <?php foreach ($sports as $sid => $sname): ?><option value="<?= (int)$sid ?>"><?= e($sname) ?></option><?php endforeach; ?>
+          </select>
+          <p class="text-xs text-gray-400 mt-1">Hold Ctrl (Cmd on Mac) to select multiple.</p>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 mt-5">
         <button type="button" onclick="document.getElementById('editModal').classList.add('hidden')" class="px-4 py-2 rounded-lg border border-gray-300">Cancel</button>
         <button class="px-4 py-2 rounded-lg bg-navy text-white font-medium">Save</button>
       </div>
     </form>
   </div>
 </div>
+
 
 <!-- CSV modal -->
 <div id="csvModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
