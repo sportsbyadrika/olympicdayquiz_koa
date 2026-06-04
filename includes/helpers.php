@@ -78,6 +78,22 @@ function app_url(string $path = ''): string
     return $scheme . '://' . $host . BASE_URL . $path;
 }
 
+/** Shared site footer markup (used by footer.php and standalone pages). */
+function site_footer_html(): string
+{
+    return '<footer class="bg-navy text-white/80 mt-8">'
+        . '<div class="max-w-7xl mx-auto px-4 py-6 text-sm grid gap-2 sm:grid-cols-3 items-center text-center">'
+        . '<div class="sm:text-left">&copy; ' . date('Y') . ' '
+        . '<a href="https://keralaolympic.org/olympicday-run2026.php" target="_blank" rel="noopener noreferrer" class="hover:text-white underline-offset-2 hover:underline">' . e(APP_ORG) . '</a>'
+        . '</div>'
+        . '<div class="font-medium text-white/90">' . e(APP_NAME) . '</div>'
+        . '<div class="sm:text-right">'
+        . '<a href="https://sportsmis.com" target="_blank" rel="noopener noreferrer" class="hover:text-white underline-offset-2 hover:underline">Software by SportsMIS.com&reg;</a>'
+        . '</div>'
+        . '</div>'
+        . '</footer>';
+}
+
 /** Email login credentials (email + new password) to a user. Returns true if sent. */
 function email_login_credentials(string $toEmail, string $toName, string $password): bool
 {
