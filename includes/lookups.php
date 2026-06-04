@@ -7,7 +7,7 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/config/db.php';
 
-const LOOKUP_TABLES = ['school_types', 'syllabi'];
+const LOOKUP_TABLES = ['school_types', 'syllabi', 'sports'];
 
 /** Rows [id => name] for a whitelisted lookup table, ordered by name. */
 function lookup_map(string $table): array

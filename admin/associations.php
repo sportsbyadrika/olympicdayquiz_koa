@@ -7,7 +7,27 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/includes/auth.php';
 require_once dirname(__DIR__) . '/includes/users.php';
+require_once dirname(__DIR__) . '/includes/lookups.php';
 require_role('admin');
+
+/** Sport ids managed by an association. */
+function association_sport_ids(int $aid): array
+{
+    $st = db()->prepare('SELECT sport_id FROM association_sports WHERE association_id=?');
+    $st->execute([$aid]);
+    return array_map('intval', array_column($st->fetchAll(), 'sport_id'));
+}
+
+/** Replace an association's managed sports with the given ids. */
+function save_association_sports(int $aid, array $sportIds): void
+{
+    $pdo = db();
+    $pdo->prepare('DELETE FROM association_sports WHERE association_id=?')->execute([$aid]);
+    $ins = $pdo->prepare('INSERT IGNORE INTO association_sports (association_id, sport_id) VALUES (?,?)');
+    foreach (array_unique(array_map('intval', $sportIds)) as $sid) {
+        if ($sid > 0) { $ins->execute([$aid, $sid]); }
+    }
+}
 
 $action = post('action', get('action'));
 
@@ -51,6 +71,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 if ($conductor) {
                     set_event_conductor($aid);
                 }
+                save_association_sports($aid, (array) ($_POST['sport_ids'] ?? []));
                 audit_log('association_create', 'associations', $aid, 'email=' . $email);
                 flash('success', "Association created. Temporary password: {$password}");
             } catch (Throwable $e) {
@@ -94,6 +115,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 ':n' => $name, ':e' => $email, ':p' => $person, ':ph' => $phone,
                 ':district' => $district, ':address' => $address, ':id' => $id,
             ]);
+            save_association_sports($id, (array) ($_POST['sport_ids'] ?? []));
             audit_log('association_update', 'associations', $id);
             flash('success', 'Association updated.');
         }
@@ -294,6 +316,8 @@ $rows = $listStmt->fetchAll();
 $csvReport = $_SESSION['csv_report'] ?? null;
 unset($_SESSION['csv_report']);
 
+$sports = lookup_map('sports'); // id => name, for the multi-select
+
 $pageTitle = 'Associations';
 require dirname(__DIR__) . '/includes/header.php';
 ?>
@@ -368,6 +392,7 @@ require dirname(__DIR__) . '/includes/header.php';
                   "id" => (int)$r["id"], "name" => $r["name"], "email" => $r["email"],
                   "contact_person" => $r["contact_person"], "contact_phone" => $r["contact_phone"],
                   "district" => $r["district"], "address" => $r["address"],
+                  "sport_ids" => association_sport_ids((int)$r["id"]),
                 ], JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'>
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
               </button>
@@ -402,8 +427,8 @@ require dirname(__DIR__) . '/includes/header.php';
 <?= paginate_links($page, $pages) ?>
 
 <!-- Create modal -->
-<div id="createModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl w-full max-w-md p-6">
+<div id="createModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-start justify-center p-4 overflow-y-auto">
+  <div class="bg-white rounded-2xl w-full max-w-md p-6 my-8">
     <h2 class="text-lg font-bold text-navy mb-4">Add Association</h2>
     <form method="post">
       <?= csrf_field() ?>
@@ -420,6 +445,11 @@ require dirname(__DIR__) . '/includes/header.php';
       <input name="district" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-3">
       <label class="block text-sm font-medium mb-1">Address</label>
       <textarea name="address" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-3"></textarea>
+      <label class="block text-sm font-medium mb-1">Sport(s) managed</label>
+      <select name="sport_ids[]" id="create_sports" multiple size="6" class="w-full border border-gray-300 rounded-lg px-3 py-2 mb-1">
+        <?php foreach ($sports as $sid => $sname): ?><option value="<?= (int)$sid ?>"><?= e($sname) ?></option><?php endforeach; ?>
+      </select>
+      <p class="text-xs text-gray-400 mb-3">Hold Ctrl (Cmd on Mac) to select multiple.</p>
       <label class="flex items-center gap-2 mb-4 text-sm">
         <input type="checkbox" name="is_event_conductor" value="1" class="rounded"> Mark as Event Conducting Association
       </label>
@@ -432,8 +462,8 @@ require dirname(__DIR__) . '/includes/header.php';
 </div>
 
 <!-- Edit modal -->
-<div id="editModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl w-full max-w-md p-6">
+<div id="editModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-start justify-center p-4 overflow-y-auto">
+  <div class="bg-white rounded-2xl w-full max-w-md p-6 my-8">
     <h2 class="text-lg font-bold text-navy mb-4">Edit Association</h2>
     <form method="post">
       <?= csrf_field() ?>
@@ -450,7 +480,12 @@ require dirname(__DIR__) . '/includes/header.php';
       <label class="block text-sm font-medium mb-1">District (association office)</label>
       <input name="district" id="edit_district" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-3">
       <label class="block text-sm font-medium mb-1">Address</label>
-      <textarea name="address" id="edit_address" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-4"></textarea>
+      <textarea name="address" id="edit_address" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-3"></textarea>
+      <label class="block text-sm font-medium mb-1">Sport(s) managed</label>
+      <select name="sport_ids[]" id="edit_sports" multiple size="6" class="w-full border border-gray-300 rounded-lg px-3 py-2 mb-1">
+        <?php foreach ($sports as $sid => $sname): ?><option value="<?= (int)$sid ?>"><?= e($sname) ?></option><?php endforeach; ?>
+      </select>
+      <p class="text-xs text-gray-400 mb-4">Hold Ctrl (Cmd on Mac) to select multiple.</p>
       <div class="flex justify-end gap-2">
         <button type="button" onclick="document.getElementById('editModal').classList.add('hidden')" class="px-4 py-2 rounded-lg border border-gray-300">Cancel</button>
         <button class="px-4 py-2 rounded-lg bg-navy text-white font-medium">Save</button>
@@ -512,6 +547,10 @@ require dirname(__DIR__) . '/includes/header.php';
     document.getElementById('edit_phone').value = data.contact_phone || '';
     document.getElementById('edit_district').value = data.district || '';
     document.getElementById('edit_address').value = data.address || '';
+    var ids = (data.sport_ids || []).map(String);
+    Array.from(document.getElementById('edit_sports').options).forEach(function (o) {
+      o.selected = ids.indexOf(o.value) !== -1;
+    });
     document.getElementById('editModal').classList.remove('hidden');
   }
 </script>
