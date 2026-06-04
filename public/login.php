@@ -47,8 +47,8 @@ $pageTitle = 'Login';
       navy:'#1A2B49', teal:'#00897B', lightgrey:'#F5F7FA', textdark:'#333333' } } } }
   </script>
 </head>
-<body class="h-full bg-lightgrey text-textdark">
-<div class="min-h-screen flex flex-col items-center justify-center px-4 py-10">
+<body class="bg-lightgrey text-textdark min-h-screen flex flex-col">
+<div class="flex-1 flex flex-col items-center justify-center px-4 py-10">
   <a href="<?= e(BASE_URL) ?>/public/index.php" class="flex items-center gap-2 mb-6">
     <span class="inline-flex items-center justify-center w-11 h-11 rounded-full bg-teal text-white font-bold text-lg">OD</span>
     <span class="font-semibold text-navy text-lg">Olympic Day Quiz 2026</span>
@@ -87,5 +87,6 @@ $pageTitle = 'Login';
 
   <a href="<?= e(BASE_URL) ?>/public/index.php" class="mt-6 text-sm text-gray-500 hover:text-navy">&larr; Back to home</a>
 </div>
+<?= site_footer_html() ?>
 </body>
 </html>
