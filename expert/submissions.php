@@ -14,6 +14,7 @@ $expertId = $expert['id'] ?? null;
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     csrf_check();
+    $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']);
     $action = post('action');
     $qid = int_val(post('question_id'));
 
@@ -24,6 +25,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     );
     $st->execute([$qid]);
     $src = $st->fetch();
+
+    $ok = false;
+    $message = 'Invalid request.';
+    $newStatus = null;
+    $reason = null;
 
     if ($src && in_array($action, ['accept', 'reject'], true)) {
         if ($action === 'accept') {
@@ -53,19 +59,28 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $pdo->prepare("UPDATE questions_association SET status='accepted', reject_reason=NULL WHERE id=?")->execute([$qid]);
                 $pdo->commit();
                 audit_log('question_accept', 'questions_association', $qid);
-                flash('success', 'Question accepted into the master bank.');
+                $ok = true;
+                $newStatus = 'accepted';
+                $message = 'Question accepted into the master bank.';
             } catch (Throwable $e) {
                 $pdo->rollBack();
-                flash('error', 'Could not accept question.');
+                $message = 'Could not accept question.';
             }
         } else { // reject
             $reason = post('reject_reason');
             db()->prepare("UPDATE questions_association SET status='rejected', reject_reason=:r WHERE id=:id")
                 ->execute([':r' => $reason, ':id' => $qid]);
             audit_log('question_reject', 'questions_association', $qid, $reason);
-            flash('success', 'Question rejected.');
+            $ok = true;
+            $newStatus = 'rejected';
+            $message = 'Question rejected.';
         }
     }
+
+    if ($isAjax) {
+        json_response(['ok' => $ok, 'status' => $newStatus, 'message' => $message, 'reason' => $reason]);
+    }
+    flash($ok ? 'success' : 'error', $message);
     redirect('/expert/submissions.php?submission_id=' . int_val(post('submission_id')));
 }
 
@@ -81,23 +96,61 @@ if ($submissionId) {
     $sub = $st->fetch();
     if (!$sub) { flash('error', 'Submission not found.'); redirect('/expert/submissions.php'); }
 
-    $st = db()->prepare('SELECT * FROM questions_association WHERE submission_id = ? ORDER BY question_no');
-    $st->execute([$submissionId]);
+    // Progress filter: all / pending (submitted) / accepted / rejected.
+    $qstatus = get('qstatus');
+    $statusMap = ['pending' => 'submitted', 'accepted' => 'accepted', 'rejected' => 'rejected'];
+    $where = 'submission_id = ?';
+    $params = [$submissionId];
+    if (isset($statusMap[$qstatus])) {
+        $where .= ' AND status = ?';
+        $params[] = $statusMap[$qstatus];
+    }
+    $st = db()->prepare("SELECT * FROM questions_association WHERE $where ORDER BY question_no");
+    $st->execute($params);
     $questions = $st->fetchAll();
+
+    // Counts per status for the filter chips.
+    $counts = ['all' => 0, 'pending' => 0, 'accepted' => 0, 'rejected' => 0];
+    $cstmt = db()->prepare('SELECT status, COUNT(*) c FROM questions_association WHERE submission_id=? GROUP BY status');
+    $cstmt->execute([$submissionId]);
+    foreach ($cstmt->fetchAll() as $cr) {
+        $counts['all'] += (int) $cr['c'];
+        if ($cr['status'] === 'submitted') $counts['pending'] += (int) $cr['c'];
+        elseif ($cr['status'] === 'accepted') $counts['accepted'] += (int) $cr['c'];
+        elseif ($cr['status'] === 'rejected') $counts['rejected'] += (int) $cr['c'];
+    }
 
     $pageTitle = 'Review Submission';
     require dirname(__DIR__) . '/includes/header.php';
     ?>
     <a href="<?= e(BASE_URL) ?>/expert/submissions.php" class="text-sm text-gray-500 hover:text-navy">&larr; Back to queue</a>
     <h1 class="text-2xl font-bold text-navy mt-2 mb-1"><?= e($sub['association_name']) ?></h1>
-    <p class="text-gray-500 mb-6 text-sm">Submitted <?= e(date('d M Y', strtotime((string)$sub['submission_date']))) ?> · by <?= e($sub['submitted_by_name']) ?> · <?= count($questions) ?> questions</p>
+    <p class="text-gray-500 mb-4 text-sm">Submitted <?= e(date('d M Y', strtotime((string)$sub['submission_date']))) ?> · by <?= e($sub['submitted_by_name']) ?> · <?= (int)$counts['all'] ?> questions</p>
+
+    <?php
+    $chips = ['all' => 'All', 'pending' => 'Pending', 'accepted' => 'Accepted', 'rejected' => 'Rejected'];
+    $activeChip = isset($statusMap[$qstatus]) ? $qstatus : 'all';
+    ?>
+    <div class="flex flex-wrap gap-2 mb-6">
+      <?php foreach ($chips as $key => $label):
+        $url = BASE_URL . '/expert/submissions.php?submission_id=' . $submissionId . ($key === 'all' ? '' : '&qstatus=' . $key);
+        $active = $activeChip === $key;
+      ?>
+        <a href="<?= e($url) ?>" class="px-3 py-1.5 rounded-full text-sm font-medium <?= $active ? 'bg-navy text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-lightgrey' ?>">
+          <?= e($label) ?> <span class="<?= $active ? 'text-white/80' : 'text-gray-400' ?>">(<?= (int)$counts[$key] ?>)</span>
+        </a>
+      <?php endforeach; ?>
+    </div>
 
     <div class="space-y-4">
-      <?php foreach ($questions as $q): ?>
-        <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+      <?php if (!$questions): ?>
+        <div class="bg-white rounded-xl border border-gray-100 p-8 text-center text-gray-400">No questions in this view.</div>
+      <?php endif; ?>
+      <?php foreach ($questions as $q): $qidInt = (int)$q['id']; ?>
+        <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5" id="card-<?= $qidInt ?>">
           <div class="flex items-start justify-between gap-3 mb-3">
             <div class="font-semibold text-navy">Q<?= (int)$q['question_no'] ?>. <?= e($q['question_text']) ?></div>
-            <div><?= status_badge($q['status']) ?></div>
+            <div id="badge-<?= $qidInt ?>"><?= status_badge($q['status']) ?></div>
           </div>
           <div class="grid sm:grid-cols-2 gap-2 text-sm mb-3">
             <?php foreach (['A'=>'option_a','B'=>'option_b','C'=>'option_c','D'=>'option_d'] as $L=>$col): ?>
@@ -113,40 +166,91 @@ if ($submissionId) {
             <?= $q['reference_source'] ? ' · Ref: ' . e($q['reference_source']) : '' ?>
           </div>
           <?php if ($q['explanation']): ?><div class="text-xs text-gray-500 mb-3 italic">Explanation: <?= e($q['explanation']) ?></div><?php endif; ?>
-          <?php if ($q['status'] === 'rejected' && $q['reject_reason']): ?>
-            <div class="text-xs text-red-600 mb-3">Rejected: <?= e($q['reject_reason']) ?></div>
-          <?php endif; ?>
+          <div id="rejreason-<?= $qidInt ?>" class="text-xs text-red-600 mb-3 <?= ($q['status'] === 'rejected' && $q['reject_reason']) ? '' : 'hidden' ?>">Rejected: <span class="rej-text"><?= e($q['reject_reason'] ?? '') ?></span></div>
 
-          <?php if ($q['status'] === 'submitted'): ?>
-            <div class="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
-              <form method="post" class="flex items-center gap-2">
+          <div id="actions-<?= $qidInt ?>">
+            <?php if ($q['status'] === 'submitted'): ?>
+              <div class="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
+                <form method="post" class="reviewForm flex items-center gap-2" data-qid="<?= $qidInt ?>">
+                  <?= csrf_field() ?>
+                  <input type="hidden" name="action" value="accept">
+                  <input type="hidden" name="question_id" value="<?= $qidInt ?>">
+                  <input type="hidden" name="submission_id" value="<?= $submissionId ?>">
+                  <select name="suggested_round" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                    <option value="either">Either round</option>
+                    <option value="round1">Round 1</option>
+                    <option value="round2">Round 2</option>
+                  </select>
+                  <button class="bg-teal text-white rounded-lg px-3 py-1.5 text-sm font-medium">Accept</button>
+                </form>
+                <button type="button" onclick="document.getElementById('rej<?= $qidInt ?>').classList.toggle('hidden')" class="bg-white border border-red-300 text-red-600 rounded-lg px-3 py-1.5 text-sm font-medium">Reject</button>
+              </div>
+              <form method="post" id="rej<?= $qidInt ?>" class="reviewForm hidden mt-2 flex gap-2" data-qid="<?= $qidInt ?>">
                 <?= csrf_field() ?>
-                <input type="hidden" name="action" value="accept">
-                <input type="hidden" name="question_id" value="<?= (int)$q['id'] ?>">
+                <input type="hidden" name="action" value="reject">
+                <input type="hidden" name="question_id" value="<?= $qidInt ?>">
                 <input type="hidden" name="submission_id" value="<?= $submissionId ?>">
-                <select name="suggested_round" class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
-                  <option value="either">Either round</option>
-                  <option value="round1">Round 1</option>
-                  <option value="round2">Round 2</option>
-                </select>
-                <button class="bg-teal text-white rounded-lg px-3 py-1.5 text-sm font-medium">Accept</button>
+                <input name="reject_reason" placeholder="Reason for rejection" required class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+                <button class="bg-red-600 text-white rounded-lg px-3 py-1.5 text-sm">Confirm Reject</button>
               </form>
-              <button onclick="document.getElementById('rej<?= (int)$q['id'] ?>').classList.toggle('hidden')" class="bg-white border border-red-300 text-red-600 rounded-lg px-3 py-1.5 text-sm font-medium">Reject</button>
-            </div>
-            <form method="post" id="rej<?= (int)$q['id'] ?>" class="hidden mt-2 flex gap-2">
-              <?= csrf_field() ?>
-              <input type="hidden" name="action" value="reject">
-              <input type="hidden" name="question_id" value="<?= (int)$q['id'] ?>">
-              <input type="hidden" name="submission_id" value="<?= $submissionId ?>">
-              <input name="reject_reason" placeholder="Reason for rejection" required class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
-              <button class="bg-red-600 text-white rounded-lg px-3 py-1.5 text-sm">Confirm Reject</button>
-            </form>
-          <?php elseif ($q['status'] === 'accepted'): ?>
-            <div class="text-sm text-teal border-t border-gray-100 pt-3">Accepted — edit it in the <a href="<?= e(BASE_URL) ?>/expert/master_questions.php" class="underline">Master Bank</a>.</div>
-          <?php endif; ?>
+            <?php elseif ($q['status'] === 'accepted'): ?>
+              <div class="text-sm text-teal border-t border-gray-100 pt-3">Accepted — edit it in the <a href="<?= e(BASE_URL) ?>/expert/master_questions.php" class="underline">Master Bank</a>.</div>
+            <?php endif; ?>
+          </div>
         </div>
       <?php endforeach; ?>
     </div>
+
+    <div id="reviewToast" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-navy text-white text-sm rounded-lg px-4 py-2 shadow-lg"></div>
+
+    <script>
+      const API = '<?= e(BASE_URL) ?>/expert/submissions.php';
+      const CSRF = '<?= e(csrf_token()) ?>';
+
+      function toast(msg, ok) {
+        const t = document.getElementById('reviewToast');
+        t.textContent = msg;
+        t.classList.remove('hidden', 'bg-navy', 'bg-red-600');
+        t.classList.add(ok ? 'bg-navy' : 'bg-red-600');
+        clearTimeout(t._t);
+        t._t = setTimeout(() => t.classList.add('hidden'), 2500);
+      }
+      function badgeHtml(status) {
+        const map = { accepted: 'bg-green-100 text-green-800', rejected: 'bg-red-100 text-red-800' };
+        const label = status.charAt(0).toUpperCase() + status.slice(1);
+        return '<span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium ' + (map[status] || 'bg-gray-100 text-gray-700') + '">' + label + '</span>';
+      }
+
+      document.querySelectorAll('form.reviewForm').forEach(function (form) {
+        form.addEventListener('submit', function (ev) {
+          ev.preventDefault();
+          const qid = form.dataset.qid;
+          const btn = form.querySelector('button[type=submit], button:not([type])');
+          if (btn) { btn.disabled = true; btn.classList.add('opacity-60'); }
+          fetch(API, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: new FormData(form)
+          }).then(r => r.json()).then(function (d) {
+            if (!d.ok) { toast(d.message || 'Action failed.', false); if (btn) { btn.disabled = false; btn.classList.remove('opacity-60'); } return; }
+            document.getElementById('badge-' + qid).innerHTML = badgeHtml(d.status);
+            const actions = document.getElementById('actions-' + qid);
+            if (d.status === 'accepted') {
+              actions.innerHTML = '<div class="text-sm text-teal border-t border-gray-100 pt-3">Accepted — edit it in the <a href="<?= e(BASE_URL) ?>/expert/master_questions.php" class="underline">Master Bank</a>.</div>';
+            } else if (d.status === 'rejected') {
+              actions.innerHTML = '';
+              const rr = document.getElementById('rejreason-' + qid);
+              rr.querySelector('.rej-text').textContent = d.reason || '';
+              rr.classList.remove('hidden');
+            }
+            toast(d.message || 'Done.', true);
+          }).catch(function () {
+            toast('Network error. Please retry.', false);
+            if (btn) { btn.disabled = false; btn.classList.remove('opacity-60'); }
+          });
+        });
+      });
+    </script>
     <?php
     require dirname(__DIR__) . '/includes/footer.php';
     exit;
