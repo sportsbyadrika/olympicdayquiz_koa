@@ -258,19 +258,24 @@ if ($submissionId) {
 
 // ---- Queue list --------------------------------------------------------
 $fAssoc = int_val(get('association_id'));
-$fStatus = get('status');
+$fProgress = get('progress'); // '' | pending | reviewed
 $fDate = get('date');
 
 $sql = 'SELECT s.*, a.name AS association_name,
         (SELECT COUNT(*) FROM questions_association q WHERE q.submission_id=s.id) AS total_q,
         (SELECT COUNT(*) FROM questions_association q WHERE q.submission_id=s.id AND q.status=\'accepted\') AS accepted_q,
         (SELECT COUNT(*) FROM questions_association q WHERE q.submission_id=s.id AND q.status=\'submitted\') AS pending_q
-        FROM question_submissions s JOIN associations a ON a.id=s.association_id WHERE 1=1';
+        FROM question_submissions s JOIN associations a ON a.id=s.association_id
+        WHERE s.status = \'submitted\'';
 $params = [];
 if ($fAssoc)  { $sql .= ' AND s.association_id = :aid'; $params[':aid'] = $fAssoc; }
 if ($fDate !== '') { $sql .= ' AND s.submission_date = :d'; $params[':d'] = $fDate; }
-if ($fStatus === 'submitted' || $fStatus === 'draft') { $sql .= ' AND s.status = :st'; $params[':st'] = $fStatus; }
-else { $sql .= " AND s.status = 'submitted'"; }
+// Progress filter: pending = still has unreviewed questions; reviewed = none left.
+if ($fProgress === 'pending') {
+    $sql .= " AND EXISTS (SELECT 1 FROM questions_association q WHERE q.submission_id=s.id AND q.status='submitted')";
+} elseif ($fProgress === 'reviewed') {
+    $sql .= " AND NOT EXISTS (SELECT 1 FROM questions_association q WHERE q.submission_id=s.id AND q.status='submitted')";
+}
 $sql .= ' ORDER BY s.submitted_at DESC, s.id DESC';
 $st = db()->prepare($sql);
 $st->execute($params);
@@ -289,8 +294,10 @@ require dirname(__DIR__) . '/includes/header.php';
     <?php foreach ($assocs as $a): ?><option value="<?= (int)$a['id'] ?>" <?= $fAssoc===(int)$a['id']?'selected':'' ?>><?= e($a['name']) ?></option><?php endforeach; ?>
   </select>
   <input type="date" name="date" value="<?= e($fDate) ?>" class="border border-gray-300 rounded-lg px-3 py-2.5">
-  <select name="status" class="border border-gray-300 rounded-lg px-3 py-2.5">
-    <option value="submitted" <?= $fStatus==='submitted'?'selected':'' ?>>Submitted</option>
+  <select name="progress" class="border border-gray-300 rounded-lg px-3 py-2.5">
+    <option value="">All progress</option>
+    <option value="pending" <?= $fProgress==='pending'?'selected':'' ?>>Pending review</option>
+    <option value="reviewed" <?= $fProgress==='reviewed'?'selected':'' ?>>Reviewed</option>
   </select>
   <button class="bg-navy text-white rounded-lg px-4 py-2.5 text-sm font-medium">Filter</button>
 </form>
