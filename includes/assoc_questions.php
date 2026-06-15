@@ -55,3 +55,42 @@ function read_question_input(): array
     if ($data['sport'] === '') $errors[] = 'Sport is required.';
     return [$data, $errors];
 }
+
+/** Expected column order for bulk question upload (CSV/XLSX header row). */
+function question_upload_columns(): array
+{
+    return ['question_text', 'option_a', 'option_b', 'option_c', 'option_d',
+        'correct_option', 'sport', 'category', 'difficulty', 'reference_source', 'explanation'];
+}
+
+/**
+ * Validate one bulk-upload row (positional, matching question_upload_columns()).
+ * Returns [data, errors]. Difficulty defaults to Medium when blank.
+ */
+function read_question_row(array $row): array
+{
+    $get = fn(int $i) => trim((string) ($row[$i] ?? ''));
+    $data = [
+        'question_text'    => $get(0),
+        'option_a'         => $get(1),
+        'option_b'         => $get(2),
+        'option_c'         => $get(3),
+        'option_d'         => $get(4),
+        'correct_option'   => strtoupper($get(5)),
+        'sport'            => $get(6),
+        'category'         => $get(7),
+        'difficulty'       => ucfirst(strtolower($get(8))) ?: 'Medium',
+        'reference_source' => $get(9),
+        'explanation'      => $get(10),
+    ];
+    $errors = [];
+    if ($data['question_text'] === '') $errors[] = 'question_text is required';
+    foreach (['a', 'b', 'c', 'd'] as $o) {
+        if ($data["option_{$o}"] === '') $errors[] = 'option_' . $o . ' is required';
+        elseif (mb_strlen($data["option_{$o}"]) > 500) $errors[] = 'option_' . $o . ' exceeds 500 chars';
+    }
+    if (!in_array($data['correct_option'], ['A', 'B', 'C', 'D'], true)) $errors[] = 'correct_option must be A/B/C/D';
+    if ($data['sport'] === '') $errors[] = 'sport is required';
+    if (!in_array($data['difficulty'], ['Easy', 'Medium', 'Hard'], true)) $errors[] = 'difficulty must be Easy/Medium/Hard';
+    return [$data, $errors];
+}

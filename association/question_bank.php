@@ -10,15 +10,39 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/includes/auth.php';
 require_once dirname(__DIR__) . '/includes/assoc_questions.php';
+require_once dirname(__DIR__) . '/includes/spreadsheet.php';
 require_role('association');
 
 $assoc = current_profile();
 if (!$assoc) { redirect('/public/logout.php'); }
 $aid = (int) $assoc['id'];
 
+// ---- Download a CSV template (GET, before any output) --------------------
+if (get('action') === 'template') {
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="question_upload_template.csv"');
+    $out = fopen('php://output', 'w');
+    fputcsv($out, question_upload_columns());
+    fputcsv($out, [
+        'Who won the 2024 Olympics 100m gold?', 'Athlete A', 'Athlete B', 'Athlete C', 'Athlete D',
+        'B', 'Athletics', 'Track & Field', 'Medium', 'World Athletics', 'Athlete B set a new record.',
+    ]);
+    fclose($out);
+    exit;
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     csrf_check();
     $action = post('action');
+
+    // ---- Bulk upload questions (CSV / XLSX) -----------------------------
+    if ($action === 'bulk_upload') {
+        $_SESSION['bulk_report'] = handle_question_bulk_upload($aid, $assoc);
+        $r = $_SESSION['bulk_report'];
+        flash($r['ok'] ? 'success' : 'warning',
+            "Upload processed: {$r['inserted']} added as draft, " . count($r['errors']) . ' row error(s).');
+        redirect('/association/question_bank.php');
+    }
 
     // ---- Delete question (draft only) -----------------------------------
     if ($action === 'delete_question') {
@@ -80,6 +104,97 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     }
 }
 
+/**
+ * Parse an uploaded CSV/XLSX of questions and insert valid rows into the
+ * association's draft bank (status 'draft'). Returns a report array.
+ */
+function handle_question_bulk_upload(int $aid, array $assoc): array
+{
+    $report = ['ok' => false, 'inserted' => 0, 'errors' => []];
+    $file = $_FILES['upload_file'] ?? null;
+
+    if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
+        $report['errors'][] = ['row' => 0, 'message' => 'No file uploaded or upload error.'];
+        return $report;
+    }
+    if ($file['size'] > 4 * 1024 * 1024) {
+        $report['errors'][] = ['row' => 0, 'message' => 'File exceeds 4 MB limit.'];
+        return $report;
+    }
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    if (!in_array($ext, ['csv', 'xlsx'], true)) {
+        $report['errors'][] = ['row' => 0, 'message' => 'Please upload a .csv or .xlsx file.'];
+        return $report;
+    }
+
+    try {
+        $rows = read_spreadsheet_rows($file['tmp_name'], $file['name']);
+    } catch (Throwable $e) {
+        $report['errors'][] = ['row' => 0, 'message' => 'Could not read the file: ' . $e->getMessage()];
+        return $report;
+    }
+
+    if (!$rows) {
+        $report['errors'][] = ['row' => 0, 'message' => 'The file is empty.'];
+        return $report;
+    }
+
+    // Validate header row against the expected column order.
+    $expected = question_upload_columns();
+    $header = array_map(fn($h) => strtolower(trim((string) $h)), $rows[0]);
+    if (array_slice($header, 0, count($expected)) !== $expected) {
+        $report['errors'][] = ['row' => 1, 'message' => 'Header must be: ' . implode(', ', $expected)];
+        return $report;
+    }
+
+    $draft = ensure_draft($aid, $assoc);
+    $pdo = db();
+    $nextNo = (int) (function () use ($pdo, $draft) {
+        $st = $pdo->prepare('SELECT COALESCE(MAX(question_no),0)+1 FROM questions_association WHERE submission_id=?');
+        $st->execute([$draft['id']]);
+        return $st->fetchColumn();
+    })();
+
+    $ins = $pdo->prepare(
+        'INSERT INTO questions_association
+         (submission_id, question_no, question_text, option_a, option_b, option_c, option_d, correct_option, sport, category, difficulty, reference_source, explanation, status)
+         VALUES (:sid,:no,:qt,:a,:b,:c,:d,:co,:sport,:cat,:diff,:ref,:exp,\'draft\')'
+    );
+
+    $maxRows = 1000;
+    $count = count($rows);
+    for ($i = 1; $i < $count; $i++) {
+        $rowNum = $i + 1; // 1-based incl. header
+        if ($i > $maxRows) {
+            $report['errors'][] = ['row' => $rowNum, 'message' => "Max {$maxRows} rows exceeded."];
+            break;
+        }
+        $row = $rows[$i];
+        if (count(array_filter($row, fn($c) => trim((string) $c) !== '')) === 0) {
+            continue; // skip blank line
+        }
+        [$d, $errs] = read_question_row($row);
+        if ($errs) {
+            $report['errors'][] = ['row' => $rowNum, 'message' => implode('; ', $errs)];
+            continue;
+        }
+        try {
+            $ins->execute([
+                ':sid' => $draft['id'], ':no' => $nextNo++, ':qt' => $d['question_text'],
+                ':a' => $d['option_a'], ':b' => $d['option_b'], ':c' => $d['option_c'], ':d' => $d['option_d'],
+                ':co' => $d['correct_option'], ':sport' => $d['sport'], ':cat' => $d['category'],
+                ':diff' => $d['difficulty'], ':ref' => $d['reference_source'], ':exp' => $d['explanation'],
+            ]);
+            $report['inserted']++;
+        } catch (Throwable $e) {
+            $report['errors'][] = ['row' => $rowNum, 'message' => 'Insert failed.'];
+        }
+    }
+    $report['ok'] = $report['inserted'] > 0;
+    audit_log('question_bulk_upload', 'questions_association', null, "inserted={$report['inserted']}");
+    return $report;
+}
+
 // -------------------- Draft questions: filter + pagination ----------------
 $draft = active_draft($aid);
 $fq = get('q');
@@ -118,6 +233,9 @@ if ($draft) {
 $defaultBy = $assoc['contact_person'] ?? '';
 $defaultEmail = $assoc['contact_email'] ?? '';
 
+$bulkReport = $_SESSION['bulk_report'] ?? null;
+unset($_SESSION['bulk_report']);
+
 $pageTitle = 'My Question Bank';
 require dirname(__DIR__) . '/includes/header.php';
 ?>
@@ -125,7 +243,21 @@ require dirname(__DIR__) . '/includes/header.php';
   <h1 class="text-2xl font-bold text-navy">My Question Bank</h1>
   <a href="<?= e(BASE_URL) ?>/association/submissions.php" class="text-sm text-teal hover:underline">View my submissions &rarr;</a>
 </div>
-<p class="text-gray-500 mb-6 text-sm">Add questions to your draft bank, then select the ones to submit to the experts. Manual entry only.</p>
+<p class="text-gray-500 mb-6 text-sm">Add questions to your draft bank, then select the ones to submit to the experts.</p>
+
+<?php if ($bulkReport): ?>
+  <?php if ($bulkReport['inserted'] > 0): ?>
+    <div class="bg-green-50 border border-green-200 rounded-lg px-4 py-3 mb-3 text-sm text-green-800"><?= (int)$bulkReport['inserted'] ?> question(s) added to your draft bank.</div>
+  <?php endif; ?>
+  <?php if (!empty($bulkReport['errors'])): ?>
+    <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-3">
+      <div class="font-semibold text-amber-800 mb-2">Rows skipped</div>
+      <ul class="text-sm text-amber-800 list-disc list-inside space-y-0.5 max-h-48 overflow-y-auto">
+        <?php foreach ($bulkReport['errors'] as $err): ?><li>Row <?= (int)$err['row'] ?>: <?= e($err['message']) ?></li><?php endforeach; ?>
+      </ul>
+    </div>
+  <?php endif; ?>
+<?php endif; ?>
 
 <!-- Toolbar -->
 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
@@ -134,7 +266,10 @@ require dirname(__DIR__) . '/includes/header.php';
     <button class="bg-navy text-white rounded-lg px-4 py-2 text-sm">Search</button>
     <?php if ($fq !== ''): ?><a href="<?= e(BASE_URL) ?>/association/question_bank.php" class="px-4 py-2 rounded-lg border border-gray-300 text-sm self-center">Clear</a><?php endif; ?>
   </form>
-  <a href="<?= e(BASE_URL) ?>/association/question_form.php" class="bg-teal text-white rounded-lg px-4 py-2 text-sm font-medium min-h-[44px] whitespace-nowrap inline-flex items-center">+ Add Question</a>
+  <div class="flex gap-2">
+    <button onclick="document.getElementById('bulkModal').classList.remove('hidden')" class="bg-white border border-navy text-navy rounded-lg px-4 py-2 text-sm font-medium min-h-[44px] whitespace-nowrap">Bulk Upload</button>
+    <a href="<?= e(BASE_URL) ?>/association/question_form.php" class="bg-teal text-white rounded-lg px-4 py-2 text-sm font-medium min-h-[44px] whitespace-nowrap inline-flex items-center">+ Add Question</a>
+  </div>
 </div>
 
 <div class="text-sm text-gray-500 mb-3">
@@ -193,6 +328,29 @@ require dirname(__DIR__) . '/includes/header.php';
   <span class="text-sm text-gray-500 ml-2">Select questions above, then submit. Submitted questions can no longer be edited.</span>
 </div>
 <?php endif; ?>
+
+<!-- Bulk upload modal -->
+<div id="bulkModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-start justify-center p-4 overflow-y-auto">
+  <div class="bg-white rounded-2xl w-full max-w-lg p-6 my-8">
+    <h2 class="text-lg font-bold text-navy mb-1">Bulk Upload Questions</h2>
+    <p class="text-sm text-gray-500 mb-4">Upload a <strong>.xlsx</strong> or <strong>.csv</strong> file. Uploaded questions are added to your draft bank, where you can review, edit and then submit them.</p>
+    <div class="bg-lightgrey rounded-lg p-3 mb-4 text-xs text-gray-600">
+      <div class="font-medium text-navy mb-1">Columns (in this order):</div>
+      <code class="break-words">question_text, option_a, option_b, option_c, option_d, correct_option, sport, category, difficulty, reference_source, explanation</code>
+      <div class="mt-2"><code>correct_option</code> = A/B/C/D · <code>difficulty</code> = Easy/Medium/Hard · <code>sport</code> required · category, reference, explanation optional.</div>
+      <a href="<?= e(BASE_URL) ?>/association/question_bank.php?action=template" class="inline-block mt-2 text-teal hover:underline">&darr; Download CSV template</a>
+    </div>
+    <form method="post" enctype="multipart/form-data">
+      <?= csrf_field() ?>
+      <input type="hidden" name="action" value="bulk_upload">
+      <input type="file" name="upload_file" accept=".csv,.xlsx" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-4">
+      <div class="flex justify-end gap-2">
+        <button type="button" onclick="document.getElementById('bulkModal').classList.add('hidden')" class="px-4 py-2 rounded-lg border border-gray-300">Cancel</button>
+        <button class="px-4 py-2 rounded-lg bg-navy text-white font-medium">Upload</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <!-- Submission header modal (shown only at submit time) -->
 <div id="submitModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-start justify-center p-4 overflow-y-auto">
