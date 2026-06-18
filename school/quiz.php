@@ -22,23 +22,101 @@ if (!$slot || !school_in_slot($schoolId, $slotId)) {
     redirect('/school/index.php');
 }
 
-$session = start_or_resume_session($schoolId, $slotId);
-if (!$session) {
-    flash('error', 'The quiz is not available — the slot window may be closed or no questions are assigned.');
-    redirect('/school/index.php');
-}
+$session = get_session($schoolId, $slotId);
 
 // Post-submit lockout: cannot re-enter the quiz once finalized.
-if (in_array($session['status'], ['submitted', 'force_submitted'], true)) {
+if ($session && in_array($session['status'], ['submitted', 'force_submitted'], true)) {
     flash('info', 'Your quiz has been submitted. Results will be shown after declaration.');
     redirect('/school/index.php');
 }
 
-// Expired on load → force-submit and bounce out.
-if (session_expired($session, $slot)) {
+// Existing in-progress session that has expired → force-submit and bounce out.
+if ($session && session_expired($session, $slot)) {
     finalize_session((int) $session['id'], 'force_submitted');
     flash('warning', 'Time was up — your quiz was submitted automatically.');
     redirect('/school/index.php');
+}
+
+// Not started yet → show instructions; the student must accept before the
+// session (and timer) start.
+if (!$session) {
+    $windowOpen = slot_window_open($slot);
+    $questionCount = count(slot_question_ids($slotId));
+
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && post('action') === 'start') {
+        csrf_check();
+        if (post('accept') !== '1') {
+            flash('warning', 'Please tick the box to accept the instructions before starting.');
+            redirect('/school/quiz.php?slot_id=' . $slotId);
+        }
+        $started = start_or_resume_session($schoolId, $slotId);
+        if (!$started) {
+            flash('error', 'The quiz is not available — the slot window may be closed or no questions are assigned.');
+            redirect('/school/index.php');
+        }
+        // Re-enter as a GET so a page refresh cannot resubmit.
+        redirect('/school/quiz.php?slot_id=' . $slotId);
+    }
+
+    $pageTitle = 'Quiz instructions';
+    require dirname(__DIR__) . '/includes/header.php';
+    ?>
+    <a href="<?= e(BASE_URL) ?>/school/index.php" class="text-sm text-gray-500 hover:text-navy">&larr; Back to dashboard</a>
+    <div class="max-w-2xl mx-auto mt-3">
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 sm:p-8">
+        <div class="text-xs font-semibold text-teal">Round <?= (int)$slot['round_no'] ?></div>
+        <h1 class="text-2xl font-bold text-navy mb-1"><?= e($slot['slot_name']) ?></h1>
+        <p class="text-sm text-gray-500 mb-5">
+          Window: <?= e(date('d M Y, H:i', strtotime((string)$slot['start_time']))) ?> – <?= e(date('H:i', strtotime((string)$slot['end_time']))) ?>
+          · Duration: <?= (int)$slot['quiz_duration_min'] ?> min · <?= (int)$questionCount ?> questions
+        </p>
+
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-5">
+          <div class="font-semibold text-amber-800 mb-2">Please read carefully before you start</div>
+          <ul class="text-sm text-amber-900 space-y-1.5 list-disc list-inside">
+            <li>The timer starts the moment you press <strong>Start Quiz</strong> and runs continuously — it does <strong>not</strong> pause.</li>
+            <li>You can only move <strong>forward</strong>. Once you go to the next question you <strong>cannot return</strong> to a previous question.</li>
+            <li>Each answer is saved automatically as soon as you select it.</li>
+            <li>Unanswered questions are scored as zero.</li>
+            <li>When the time runs out, your quiz is <strong>submitted automatically</strong>.</li>
+            <li>Attempt the quiz on your own. Looking up answers elsewhere is not allowed.</li>
+          </ul>
+        </div>
+
+        <?php if (!$windowOpen): ?>
+          <div class="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-600">
+            This quiz is not open right now. You can start only during the slot window shown above.
+          </div>
+        <?php elseif ($questionCount === 0): ?>
+          <div class="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-600">
+            No questions have been assigned to this slot yet. Please check back shortly.
+          </div>
+        <?php else: ?>
+          <form method="post" id="startForm">
+            <?= csrf_field() ?>
+            <input type="hidden" name="action" value="start">
+            <label class="flex items-start gap-2 text-sm text-gray-700 mb-5">
+              <input type="checkbox" name="accept" value="1" id="acceptChk" class="mt-0.5 rounded">
+              <span>I have read and understood the instructions above, including that <strong>I cannot go back to a previous question</strong> once I move forward.</span>
+            </label>
+            <button type="submit" id="startBtn" disabled class="bg-navy text-white font-semibold rounded-lg px-6 py-3 min-h-[44px] opacity-50 cursor-not-allowed">Start Quiz</button>
+          </form>
+          <script>
+            (function () {
+              var c = document.getElementById('acceptChk'), b = document.getElementById('startBtn');
+              c.addEventListener('change', function () {
+                b.disabled = !c.checked;
+                b.classList.toggle('opacity-50', !c.checked);
+                b.classList.toggle('cursor-not-allowed', !c.checked);
+              });
+            })();
+          </script>
+        <?php endif; ?>
+      </div>
+    </div>
+    <?php
+    require dirname(__DIR__) . '/includes/footer.php';
+    exit;
 }
 
 // Load ordered questions (no correct answer leaked).
@@ -80,8 +158,7 @@ require dirname(__DIR__) . '/includes/header.php';
     <div id="questionArea"></div>
     <div class="flex flex-wrap items-center justify-between gap-3 mt-6 border-t border-gray-100 pt-4">
       <div class="flex gap-2">
-        <button id="btnBack" class="bg-white border border-gray-300 rounded-lg px-4 py-2.5 text-sm font-medium min-h-[44px]">&larr; Back</button>
-        <button id="btnNext" class="bg-white border border-gray-300 rounded-lg px-4 py-2.5 text-sm font-medium min-h-[44px]">Next &rarr;</button>
+        <button id="btnNext" class="bg-navy text-white rounded-lg px-5 py-2.5 text-sm font-medium min-h-[44px]">Next &rarr;</button>
       </div>
       <div class="flex gap-2">
         <span id="saveStatus" class="text-xs text-gray-400 self-center"></span>
@@ -159,13 +236,14 @@ require dirname(__DIR__) . '/includes/header.php';
     el('questionArea').querySelectorAll('input[name=opt]').forEach(r => {
       r.addEventListener('change', () => selectOption(q.id, r.value));
     });
-    el('btnBack').disabled = current === 0;
-    el('btnBack').classList.toggle('opacity-40', current === 0);
-    el('btnNext').disabled = current === QUESTIONS.length - 1;
-    el('btnNext').classList.toggle('opacity-40', current === QUESTIONS.length - 1);
+    const last = current === QUESTIONS.length - 1;
+    el('btnNext').disabled = last;
+    el('btnNext').classList.toggle('hidden', last); // on the last question, use Finish
     renderNav();
   }
 
+  // Read-only progress indicator. Jumping is disabled so students cannot
+  // navigate back to an earlier question.
   function renderNav() {
     const build = (containerId) => {
       const c = el(containerId);
@@ -173,13 +251,13 @@ require dirname(__DIR__) . '/includes/header.php';
       c.innerHTML = '';
       QUESTIONS.forEach((q, i) => {
         const answered = !!answers[q.id];
-        const b = document.createElement('button');
-        b.textContent = i + 1;
-        b.className = 'h-9 rounded text-sm font-medium ' +
+        const done = i < current;
+        const d = document.createElement('div');
+        d.textContent = i + 1;
+        d.className = 'h-9 flex items-center justify-center rounded text-sm font-medium select-none ' +
           (i === current ? 'ring-2 ring-navy ' : '') +
-          (answered ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600');
-        b.addEventListener('click', () => { current = i; renderQuestion(); closeDrawer(); });
-        c.appendChild(b);
+          (answered ? 'bg-green-500 text-white' : (done ? 'bg-gray-300 text-gray-600' : 'bg-gray-200 text-gray-500'));
+        c.appendChild(d);
       });
     };
     build('qNav');
@@ -202,9 +280,14 @@ require dirname(__DIR__) . '/includes/header.php';
     }).catch(() => { el('saveStatus').textContent = 'Offline — will retry'; });
   }
 
-  // Navigation
-  el('btnBack').addEventListener('click', () => { if (current > 0) { current--; renderQuestion(); } });
-  el('btnNext').addEventListener('click', () => { if (current < QUESTIONS.length - 1) { current++; renderQuestion(); } });
+  // Navigation — forward only. Confirm before advancing because there is no way back.
+  el('btnNext').addEventListener('click', () => {
+    if (current >= QUESTIONS.length - 1) return;
+    if (!confirm('Move to the next question?\n\nYou will NOT be able to come back to this question.')) return;
+    current++;
+    renderQuestion();
+    closeDrawer();
+  });
 
   // Finish
   el('btnFinish').addEventListener('click', () => {
