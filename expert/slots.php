@@ -76,26 +76,41 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 
     if ($action === 'assign_school') {
         $slotId = int_val(post('slot_id'));
-        $schoolId = int_val(post('school_id'));
+        $schoolIds = array_values(array_filter(array_map('intval', (array) ($_POST['school_ids'] ?? [])), fn($i) => $i > 0));
         // Determine the slot's round.
         $st = db()->prepare('SELECT round_id FROM slots WHERE id=?');
         $st->execute([$slotId]);
         $roundId = (int) $st->fetchColumn();
-        if ($slotId && $schoolId && $roundId) {
-            // Reject if school already assigned to another slot in this round.
-            $chk = db()->prepare(
-                'SELECT COUNT(*) FROM slot_schools ss JOIN slots s ON s.id=ss.slot_id
-                 WHERE ss.school_id=? AND s.round_id=? AND ss.slot_id<>?'
-            );
+
+        if (!$slotId || !$roundId) {
+            redirect('/expert/slots.php');
+        }
+        if (!$schoolIds) {
+            flash('warning', 'Select at least one school to add.');
+            redirect('/expert/slots.php?slot_id=' . $slotId);
+        }
+
+        $chk = db()->prepare(
+            'SELECT COUNT(*) FROM slot_schools ss JOIN slots s ON s.id=ss.slot_id
+             WHERE ss.school_id=? AND s.round_id=? AND ss.slot_id<>?'
+        );
+        $ins = db()->prepare('INSERT IGNORE INTO slot_schools (slot_id, school_id) VALUES (?,?)');
+        $added = 0;
+        $skipped = 0;
+        foreach ($schoolIds as $schoolId) {
+            // Skip schools already assigned to another slot in this round.
             $chk->execute([$schoolId, $roundId, $slotId]);
             if ((int) $chk->fetchColumn() > 0) {
-                flash('error', 'That school is already assigned to another slot in this round.');
-            } else {
-                db()->prepare('INSERT IGNORE INTO slot_schools (slot_id, school_id) VALUES (?,?)')->execute([$slotId, $schoolId]);
-                audit_log('slot_assign_school', 'slot_schools', $slotId, 'school=' . $schoolId);
-                flash('success', 'School assigned to slot.');
+                $skipped++;
+                continue;
             }
+            $ins->execute([$slotId, $schoolId]);
+            if ($ins->rowCount() > 0) { $added++; }
         }
+        audit_log('slot_assign_school', 'slot_schools', $slotId, "added={$added}");
+        $msg = "{$added} school(s) assigned to the slot.";
+        if ($skipped > 0) { $msg .= " {$skipped} skipped (already in another slot this round)."; }
+        flash($added > 0 ? 'success' : 'warning', $msg);
         redirect('/expert/slots.php?slot_id=' . $slotId);
     }
 
@@ -221,16 +236,32 @@ if ($openSlotId):
       </ul>
     </div>
     <div>
-      <div class="text-sm font-medium text-gray-700 mb-2">Add a school</div>
-      <form method="post" class="flex gap-2">
-        <?= csrf_field() ?>
-        <input type="hidden" name="action" value="assign_school"><input type="hidden" name="slot_id" value="<?= $openSlotId ?>">
-        <select name="school_id" required class="flex-1 border border-gray-300 rounded-lg px-3 py-2.5 text-sm">
-          <option value="">Select a school…</option>
-          <?php foreach ($available as $sc): ?><option value="<?= (int)$sc['id'] ?>"><?= e($sc['name']) ?> (<?= e($sc['code']) ?>)</option><?php endforeach; ?>
-        </select>
-        <button class="bg-navy text-white rounded-lg px-4 py-2 text-sm">Add</button>
-      </form>
+      <div class="text-sm font-medium text-gray-700 mb-2">Add schools <span class="text-gray-400 font-normal">(<?= count($available) ?> available)</span></div>
+      <?php if (!$available): ?>
+        <p class="text-sm text-gray-400">No schools available to assign for this round.</p>
+      <?php else: ?>
+        <form method="post">
+          <?= csrf_field() ?>
+          <input type="hidden" name="action" value="assign_school"><input type="hidden" name="slot_id" value="<?= $openSlotId ?>">
+          <select name="school_ids[]" id="bulkSchools" multiple size="8" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            <?php foreach ($available as $sc): ?><option value="<?= (int)$sc['id'] ?>"><?= e($sc['name']) ?> (<?= e($sc['code']) ?>)</option><?php endforeach; ?>
+          </select>
+          <div class="flex items-center justify-between mt-2">
+            <label class="text-xs text-gray-500 flex items-center gap-1"><input type="checkbox" id="bulkSelectAll" class="rounded"> Select all</label>
+            <button class="bg-navy text-white rounded-lg px-4 py-2 text-sm">Add selected</button>
+          </div>
+          <p class="text-xs text-gray-400 mt-1">Hold Ctrl (Cmd on Mac) to pick multiple.</p>
+        </form>
+        <script>
+          (function () {
+            var sel = document.getElementById('bulkSchools');
+            var all = document.getElementById('bulkSelectAll');
+            if (all && sel) all.addEventListener('change', function () {
+              Array.from(sel.options).forEach(function (o) { o.selected = all.checked; });
+            });
+          })();
+        </script>
+      <?php endif; ?>
     </div>
   </div>
 </div>
