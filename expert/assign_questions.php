@@ -58,7 +58,7 @@ require dirname(__DIR__) . '/includes/header.php';
 </div>
 <p class="text-gray-500 mb-6 text-sm">Round <?= (int)$slot['round_no'] ?> · Drag questions from the bank into the slot. Drag within the slot to reorder.</p>
 
-<div class="grid lg:grid-cols-2 gap-6">
+<div class="grid lg:grid-cols-2 gap-6 items-start">
   <!-- Source bank -->
   <div>
     <div class="flex items-center justify-between mb-2">
@@ -83,7 +83,7 @@ require dirname(__DIR__) . '/includes/header.php';
       </select>
       <button class="bg-navy text-white rounded-lg px-3 py-2 text-xs font-medium">Filter</button>
     </form>
-    <ul id="bankList" class="space-y-2 min-h-[120px] bg-lightgrey rounded-xl p-3 border border-dashed border-gray-300">
+    <ul id="bankList" class="space-y-2 min-h-[120px] max-h-[65vh] overflow-y-auto bg-lightgrey rounded-xl p-3 border border-dashed border-gray-300">
       <?php foreach ($bank as $q): ?>
         <li class="qcard bg-white rounded-lg border border-gray-200 p-3 cursor-move" data-id="<?= (int)$q['id'] ?>">
           <div class="text-sm font-medium text-navy"><?= e(mb_strimwidth($q['question_text'],0,90,'…')) ?></div>
@@ -94,9 +94,9 @@ require dirname(__DIR__) . '/includes/header.php';
   </div>
 
   <!-- Slot target -->
-  <div>
+  <div class="lg:sticky lg:top-20">
     <h2 class="font-semibold text-navy mb-2">In this Slot</h2>
-    <ul id="slotList" class="space-y-2 min-h-[120px] bg-teal/5 rounded-xl p-3 border border-dashed border-teal/40">
+    <ul id="slotList" class="space-y-2 min-h-[120px] max-h-[65vh] overflow-y-auto bg-teal/5 rounded-xl p-3 border border-dashed border-teal/40">
       <?php foreach ($assigned as $q): ?>
         <li class="qcard bg-white rounded-lg border border-teal/30 p-3 cursor-move" data-id="<?= (int)$q['id'] ?>">
           <div class="text-sm font-medium text-navy"><?= e(mb_strimwidth($q['question_text'],0,90,'…')) ?></div>
@@ -140,14 +140,14 @@ require dirname(__DIR__) . '/includes/header.php';
   const bankEl=document.getElementById('bankList');
   const slotEl=document.getElementById('slotList');
 
-  new Sortable(bankEl,{group:'questions',animation:150,
+  new Sortable(bankEl,{group:'questions',animation:150,scroll:true,bubbleScroll:true,scrollSensitivity:60,scrollSpeed:12,
     onAdd:function(evt){
       // Card moved from slot back to bank => remove from slot.
       const id=evt.item.dataset.id;
       post({action:'remove',slot_id:SLOT_ID,question_id:id}).then(r=>{ if(r.ok) updateCount(r.count); });
     }
   });
-  new Sortable(slotEl,{group:'questions',animation:150,
+  new Sortable(slotEl,{group:'questions',animation:150,scroll:true,bubbleScroll:true,scrollSensitivity:60,scrollSpeed:12,
     onAdd:function(evt){
       const id=evt.item.dataset.id;
       post({action:'add',slot_id:SLOT_ID,question_id:id}).then(r=>{ if(r.ok){ updateCount(r.count); sendReorder(); } });
