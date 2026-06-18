@@ -202,20 +202,8 @@ function handle_association_csv(): array
 {
     $report = ['ok' => false, 'inserted' => 0, 'errors' => []];
     $file = $_FILES['csv_file'] ?? null;
-
-    if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
-        $report['errors'][] = ['row' => 0, 'message' => 'No file uploaded or upload error.'];
-        return $report;
-    }
-    if ($file['size'] > 2 * 1024 * 1024) {
-        $report['errors'][] = ['row' => 0, 'message' => 'File exceeds 2 MB limit.'];
-        return $report;
-    }
-    $finfo = finfo_open(FILEINFO_MIME_TYPE);
-    $mime = finfo_file($finfo, $file['tmp_name']);
-    finfo_close($finfo);
-    if (!in_array($mime, ['text/plain', 'text/csv', 'application/csv', 'application/vnd.ms-excel'], true)) {
-        $report['errors'][] = ['row' => 0, 'message' => "Unexpected file type ({$mime})."];
+    if ($err = validate_csv_upload($file)) {
+        $report['errors'][] = ['row' => 0, 'message' => $err];
         return $report;
     }
 

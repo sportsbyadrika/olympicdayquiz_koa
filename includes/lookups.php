@@ -16,8 +16,12 @@ function lookup_map(string $table): array
         return [];
     }
     $map = [];
-    foreach (db()->query("SELECT id, name FROM {$table} ORDER BY name")->fetchAll() as $row) {
-        $map[(int) $row['id']] = $row['name'];
+    try {
+        foreach (db()->query("SELECT id, name FROM {$table} ORDER BY name")->fetchAll() as $row) {
+            $map[(int) $row['id']] = $row['name'];
+        }
+    } catch (Throwable $e) {
+        // Table may not exist yet (migration pending) — degrade gracefully.
     }
     return $map;
 }
@@ -28,8 +32,12 @@ function lookup_id_by_name(string $table, string $name): ?int
     if (!in_array($table, LOOKUP_TABLES, true) || trim($name) === '') {
         return null;
     }
-    $st = db()->prepare("SELECT id FROM {$table} WHERE LOWER(name) = LOWER(?) LIMIT 1");
-    $st->execute([trim($name)]);
-    $id = $st->fetchColumn();
-    return $id !== false ? (int) $id : null;
+    try {
+        $st = db()->prepare("SELECT id FROM {$table} WHERE LOWER(name) = LOWER(?) LIMIT 1");
+        $st->execute([trim($name)]);
+        $id = $st->fetchColumn();
+        return $id !== false ? (int) $id : null;
+    } catch (Throwable $e) {
+        return null;
+    }
 }

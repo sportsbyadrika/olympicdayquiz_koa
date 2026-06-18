@@ -78,6 +78,38 @@ function app_url(string $path = ''): string
     return $scheme . '://' . $host . BASE_URL . $path;
 }
 
+/**
+ * Validate an uploaded CSV file. Returns an error message string, or null if OK.
+ * Resilient on hosts where the fileinfo extension is unavailable (the MIME
+ * sniff is skipped rather than fataling), and tolerant of the various MIME
+ * types browsers/Excel report for CSV.
+ */
+function validate_csv_upload(?array $file, int $maxBytes = 2097152): ?string
+{
+    if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        return 'No file uploaded or upload error.';
+    }
+    if (($file['size'] ?? 0) > $maxBytes) {
+        return 'File exceeds the ' . round($maxBytes / 1048576) . ' MB limit.';
+    }
+    $ext = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
+    if ($ext !== 'csv') {
+        return 'Please upload a .csv file.';
+    }
+    if (function_exists('finfo_open')) {
+        $finfo = @finfo_open(FILEINFO_MIME_TYPE);
+        if ($finfo) {
+            $mime = @finfo_file($finfo, $file['tmp_name']);
+            finfo_close($finfo);
+            $allowed = ['text/plain', 'text/csv', 'application/csv', 'application/vnd.ms-excel', 'application/octet-stream'];
+            if ($mime !== false && $mime !== '' && !in_array($mime, $allowed, true)) {
+                return "Unexpected file type ({$mime}). Please upload a plain CSV.";
+            }
+        }
+    }
+    return null;
+}
+
 /** Shared site footer markup (used by footer.php and standalone pages). */
 function site_footer_html(): string
 {
