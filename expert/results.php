@@ -23,6 +23,17 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         redirect('/expert/results.php#round1');
     }
 
+    if ($action === 'toggle_school_round1') {
+        $new = (string) setting('show_round1_to_school', '0') === '1' ? '0' : '1';
+        db()->prepare(
+            'INSERT INTO settings (setting_key, setting_value) VALUES (\'show_round1_to_school\', :v)
+             ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)'
+        )->execute([':v' => $new]);
+        audit_log('toggle_show_round1_to_school', 'settings', null, 'value=' . $new);
+        flash('success', $new === '1' ? 'Round 1 result is now visible on school dashboards.' : 'Round 1 result is now hidden from school dashboards.');
+        redirect('/expert/results.php#round1');
+    }
+
     if ($action === 'declare_round') {
         $roundId = int_val(post('round_id'));
         if ($roundId) {
@@ -155,6 +166,15 @@ require dirname(__DIR__) . '/includes/header.php';
       <div class="flex gap-2">
         <a href="<?= e(BASE_URL) ?>/reports/round_results.php?round=<?= $rno ?>" target="_blank" class="bg-white border border-navy text-navy rounded-lg px-4 py-2 text-sm font-medium">Print Report</a>
         <a href="<?= e(BASE_URL) ?>/reports/final_round1.php?round=<?= $rno ?>" target="_blank" class="bg-white border border-teal text-teal rounded-lg px-4 py-2 text-sm font-medium">Final Report Round <?= $rno ?></a>
+        <?php if ($rno === 1): $showR1 = (string) setting('show_round1_to_school', '0') === '1'; ?>
+          <form method="post" onsubmit="return confirm('<?= $showR1 ? 'Hide' : 'Show' ?> Round 1 result on all school dashboards?');">
+            <?= csrf_field() ?>
+            <input type="hidden" name="action" value="toggle_school_round1">
+            <button class="rounded-lg px-4 py-2 text-sm font-medium <?= $showR1 ? 'bg-teal text-white' : 'bg-white border border-gray-300 text-gray-600' ?>">
+              Result on school dashboard: <?= $showR1 ? 'ON' : 'OFF' ?>
+            </button>
+          </form>
+        <?php endif; ?>
         <?php if ($results && !$allDeclared): ?>
           <form method="post" onsubmit="return confirm('Declare Round <?= $rno ?> results to all schools?');">
             <?= csrf_field() ?>
