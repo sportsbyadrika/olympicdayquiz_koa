@@ -13,6 +13,17 @@ require_login();
 
 header('Content-Type: application/json; charset=utf-8');
 
+// Return a clean JSON error instead of a bare 500 (e.g. if chat tables are
+// missing because the migration hasn't been run yet).
+set_exception_handler(function (Throwable $e) {
+    http_response_code(200);
+    $msg = APP_ENV === 'development'
+        ? $e->getMessage()
+        : 'Chat is unavailable. The chat tables may be missing — please run database/migrations/2026_06_chat.sql.';
+    echo json_encode(['ok' => false, 'error' => $msg]);
+    exit;
+});
+
 $role = current_role();
 $userId = (int) current_user_id();
 $action = $_REQUEST['action'] ?? '';
