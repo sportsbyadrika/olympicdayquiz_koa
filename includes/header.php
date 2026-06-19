@@ -26,6 +26,7 @@ function nav_links(?string $role): array
                 ['/admin/associations.php', 'Associations'],
                 ['/admin/experts.php', 'Experts'],
                 ['/admin/schools.php', 'Schools'],
+                ['/admin/online_status.php', 'Online Status'],
                 ['/admin/login_history.php', 'Login History'],
                 ['/admin/settings.php', 'Settings'],
             ];
@@ -41,6 +42,7 @@ function nav_links(?string $role): array
                 ['/expert/submissions.php', 'Submissions'],
                 ['/expert/master_questions.php', 'Master Bank'],
                 ['/expert/slots.php', 'Slots'],
+                ['/expert/online_status.php', 'Online Status'],
                 ['/expert/results.php', 'Results'],
             ];
         case 'school':
