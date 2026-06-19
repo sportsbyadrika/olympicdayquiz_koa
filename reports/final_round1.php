@@ -16,7 +16,7 @@ $c1 = $hasCancel ? 'AND sq.cancelled = 0' : '';
 $c3 = $hasCancel ? 'AND sq3.cancelled = 0' : '';
 
 $st = db()->prepare(
-    "SELECT s.name AS school_name, s.code,
+    "SELECT s.name AS school_name, s.code, s.participant1_name, s.participant2_name, s.email, s.contact,
             qs.start_time AS session_start, qs.end_time AS session_end,
             (SELECT COUNT(*) FROM slot_questions sq WHERE sq.slot_id = qs.slot_id $c1) AS effective_total,
             (SELECT COUNT(*) FROM responses rp
@@ -51,7 +51,27 @@ foreach ($rows as &$row) {
 unset($row);
 usort($rows, fn($a, $b) => ($b['pct'] <=> $a['pct']) ?: ($a['duration_secs'] <=> $b['duration_secs']));
 
-report_header("Final Report — Round {$roundNo}", "Ranked by percentage, then time taken · top {$topN} qualify");
+// CSV export (same ranking) — must run before any HTML output.
+if (get('format') === 'csv') {
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="final_report_round' . $roundNo . '.csv"');
+    $out = fopen('php://output', 'w');
+    fputcsv($out, ['School Code', 'School Name', 'Rank', 'Status', 'Participant 1', 'Participant 2', 'Registered Email', 'Registered Mobile']);
+    foreach ($rows as $i => $r) {
+        $rank = $i + 1;
+        fputcsv($out, [
+            $r['code'], $r['school_name'], $rank, ($rank <= $topN ? 'Qualified' : 'Not Qualified'),
+            $r['participant1_name'], $r['participant2_name'], $r['email'], $r['contact'],
+        ]);
+    }
+    fclose($out);
+    exit;
+}
+
+$csvBtn = '<a href="' . e(app_url('/reports/final_round1.php?round=' . $roundNo . '&top=' . $topN . '&format=csv'))
+    . '" class="bg-white text-[#1A2B49] rounded px-4 py-2 text-sm font-semibold">Download CSV</a>';
+
+report_header("Final Report — Round {$roundNo}", "Ranked by percentage, then time taken · top {$topN} qualify", $csvBtn);
 ?>
 <table>
   <thead>
