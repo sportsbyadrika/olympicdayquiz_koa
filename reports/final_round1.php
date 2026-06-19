@@ -56,28 +56,26 @@ report_header("Final Report — Round {$roundNo}", "Ranked by percentage, then t
 <table>
   <thead>
     <tr>
-      <th style="width:48px">Rank</th>
-      <th>School</th>
-      <th style="width:70px">Code</th>
-      <th style="width:160px">Started / Completed</th>
-      <th style="width:90px">Duration</th>
-      <th style="width:100px">Status</th>
+      <th style="width:80px">Code</th>
+      <th>School Name</th>
+      <th style="width:170px">Started / Completed</th>
+      <th style="width:56px">Rank</th>
+      <th style="width:110px">Status</th>
     </tr>
   </thead>
   <tbody>
     <?php if (!$rows): ?>
-      <tr><td colspan="6" style="text-align:center;color:#9ca3af">No results recorded.</td></tr>
+      <tr><td colspan="5" style="text-align:center;color:#9ca3af">No results recorded.</td></tr>
     <?php endif; ?>
     <?php foreach ($rows as $i => $r): $rank = $i + 1; $qualified = $rank <= $topN; ?>
       <tr<?= $qualified ? ' style="background:#E8F5F3"' : '' ?>>
-        <td><?= $rank ?></td>
-        <td><?= e($r['school_name']) ?></td>
         <td><?= e($r['code']) ?></td>
+        <td><?= e($r['school_name']) ?></td>
         <td>
           <?= $r['session_start'] ? e(date('d M Y, H:i:s', strtotime((string)$r['session_start']))) : '—' ?><br>
           <?= $r['session_end'] ? e(date('d M Y, H:i:s', strtotime((string)$r['session_end']))) : '—' ?>
         </td>
-        <td><?= e(dur_str($r['session_start'] ?? null, $r['session_end'] ?? null)) ?></td>
+        <td><?= $rank ?></td>
         <td><?= $qualified ? '<strong style="color:#00897B">Qualified</strong>' : 'Not Qualified' ?></td>
       </tr>
     <?php endforeach; ?>
