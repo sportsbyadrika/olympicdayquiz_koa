@@ -111,6 +111,25 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         redirect('/admin/schools.php');
     }
 
+    if ($action === 'reset_password') {
+        $id = int_val(post('id'));
+        $new = $_POST['new_password'] ?? '';
+        $confirm = $_POST['confirm_password'] ?? '';
+        $st = db()->prepare('SELECT user_id FROM schools WHERE id=:id');
+        $st->execute([':id' => $id]);
+        $userId = (int) $st->fetchColumn();
+
+        if (!$userId)                 flash('error', 'School not found.');
+        elseif (mb_strlen($new) < 8)  flash('error', 'Password must be at least 8 characters.');
+        elseif ($new !== $confirm)    flash('error', 'Passwords do not match.');
+        else {
+            set_user_password($userId, $new);
+            audit_log('school_password_reset', 'schools', $id);
+            flash('success', 'Password updated.');
+        }
+        redirect('/admin/schools.php');
+    }
+
     if ($action === 'delete') {
         $id = int_val(post('id'));
         if ($id) {
@@ -332,6 +351,9 @@ require dirname(__DIR__) . '/includes/header.php';
               ], JSON_HEX_APOS|JSON_HEX_QUOT) ?>)'>
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
               </button>
+              <button title="Reset password" class="text-teal hover:opacity-70" onclick="openReset(<?= (int)$r['id'] ?>, <?= htmlspecialchars(json_encode($r['name']), ENT_QUOTES) ?>)">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a4 4 0 11-8 0 4 4 0 018 0zM7 11v3m0 0H4m3 0h3m4-3l2 2m0 0l2 2m-2-2l2-2m-2 2l-2 2"/></svg>
+              </button>
               <form method="post" class="inline" onsubmit="return confirm('Delete this school and login?');">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
@@ -443,7 +465,30 @@ require dirname(__DIR__) . '/includes/header.php';
   </div>
 </div>
 
+<!-- Reset password modal -->
+<div id="resetModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl w-full max-w-md p-6">
+    <h2 class="text-lg font-bold text-navy mb-1">Reset Password</h2>
+    <p id="reset_label" class="text-sm text-gray-500 mb-4"></p>
+    <form method="post" autocomplete="off">
+      <?= csrf_field() ?>
+      <input type="hidden" name="action" value="reset_password">
+      <input type="hidden" name="id" id="reset_id">
+      <label class="block text-sm font-medium mb-1">New password</label>
+      <input name="new_password" type="text" required minlength="8" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-1 font-mono">
+      <p class="text-xs text-gray-400 mb-3">At least 8 characters. You can type any password to set it directly.</p>
+      <label class="block text-sm font-medium mb-1">Confirm password</label>
+      <input name="confirm_password" type="text" required minlength="8" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-4 font-mono">
+      <div class="flex justify-end gap-2">
+        <button type="button" onclick="document.getElementById('resetModal').classList.add('hidden')" class="px-4 py-2 rounded-lg border border-gray-300">Cancel</button>
+        <button class="px-4 py-2 rounded-lg bg-teal text-white font-medium">Set Password</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
+  function openReset(id, label){document.getElementById('reset_id').value=id;document.getElementById('reset_label').textContent='For: '+label;document.getElementById('resetModal').classList.remove('hidden');}
   function openEdit(d){
     document.getElementById('edit_id').value=d.id;
     document.getElementById('edit_name').value=d.school_name||'';
