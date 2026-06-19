@@ -12,7 +12,7 @@ declare(strict_types=1);
 require_once dirname(__DIR__) . '/includes/auth.php';
 require_role('expert', 'admin');
 
-function report_header(string $title, string $subtitle = ''): void
+function report_header(string $title, string $subtitle = '', string $extraActionsHtml = ''): void
 {
     ?>
 <!DOCTYPE html>
@@ -41,7 +41,10 @@ function report_header(string $title, string $subtitle = ''): void
 <body class="bg-gray-100 text-[#333]">
   <div class="no-print bg-[#1A2B49] text-white px-4 py-3 flex items-center justify-between">
     <span class="text-sm">Printable report — opens in this tab</span>
-    <button onclick="window.print()" class="bg-[#00897B] text-white rounded px-4 py-2 text-sm font-semibold">Print / Save as PDF</button>
+    <div class="flex items-center gap-2">
+      <?= $extraActionsHtml ?>
+      <button onclick="window.print()" class="bg-[#00897B] text-white rounded px-4 py-2 text-sm font-semibold">Print / Save as PDF</button>
+    </div>
   </div>
   <div class="max-w-4xl mx-auto bg-white my-6 p-6 sm:p-10 report-card shadow">
     <header class="border-b-2 border-[#1A2B49] pb-4 mb-6">
