@@ -32,6 +32,36 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         }
         redirect('/expert/results.php');
     }
+
+    // Reset a school's attempt for a round so they can take it again from scratch.
+    if ($action === 'reset_attempt') {
+        $resultId = int_val(post('result_id'));
+        $st = db()->prepare('SELECT school_id, round_id FROM results WHERE id=?');
+        $st->execute([$resultId]);
+        $row = $st->fetch();
+        if ($row) {
+            $schoolId = (int) $row['school_id'];
+            $roundId = (int) $row['round_id'];
+            $pdo = db();
+            $pdo->beginTransaction();
+            try {
+                // Clear answers, the session(s) and the result for this school+round.
+                $pdo->prepare(
+                    'DELETE rsp FROM responses rsp JOIN quiz_sessions qs ON qs.id = rsp.session_id
+                     WHERE qs.school_id = ? AND qs.round_id = ?'
+                )->execute([$schoolId, $roundId]);
+                $pdo->prepare('DELETE FROM quiz_sessions WHERE school_id = ? AND round_id = ?')->execute([$schoolId, $roundId]);
+                $pdo->prepare('DELETE FROM results WHERE school_id = ? AND round_id = ?')->execute([$schoolId, $roundId]);
+                $pdo->commit();
+                audit_log('exam_reset', 'results', $resultId, "school={$schoolId} round={$roundId}");
+                flash('success', 'Attempt reset. The team can start the quiz again during their slot window.');
+            } catch (Throwable $e) {
+                $pdo->rollBack();
+                flash('error', 'Could not reset the attempt.');
+            }
+        }
+        redirect('/expert/results.php');
+    }
 }
 
 /** Fetch results for a round number, joined with school + session info. */
@@ -122,6 +152,7 @@ require dirname(__DIR__) . '/includes/header.php';
               <th class="px-4 py-3">Status</th>
               <?php if ($rno === 1): ?><th class="px-4 py-3">Qualify R2</th><?php endif; ?>
               <th class="px-4 py-3">Declared</th>
+              <th class="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
@@ -151,6 +182,14 @@ require dirname(__DIR__) . '/includes/header.php';
                   </td>
                 <?php endif; ?>
                 <td class="px-4 py-3"><?= (int)$r['declared']===1 ? status_badge('declared') : status_badge('pending') ?></td>
+                <td class="px-4 py-3 text-right">
+                  <form method="post" onsubmit="return confirm('Reset this team\'s attempt? Their answers and score for this round will be permanently cleared so they can start fresh.');">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="action" value="reset_attempt">
+                    <input type="hidden" name="result_id" value="<?= (int)$r['id'] ?>">
+                    <button class="text-red-600 hover:underline text-sm">Reset attempt</button>
+                  </form>
+                </td>
               </tr>
             <?php endforeach; ?>
           </tbody>

@@ -24,6 +24,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             $stmt->execute([':k' => $k, ':v' => $v]);
         }
     }
+    // School dashboard announcement (free text, may be cleared).
+    $stmt->execute([':k' => 'school_message', ':v' => post('school_message')]);
     audit_log('settings_update', 'settings');
     flash('success', 'Settings saved.');
     redirect('/admin/settings.php');
@@ -47,6 +49,11 @@ require dirname(__DIR__) . '/includes/header.php';
              class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-4">
     <?php endforeach; ?>
     <p class="text-xs text-gray-500 mb-4">New slots inherit these defaults but can be overridden per slot.</p>
+
+    <label class="block text-sm font-medium mb-1">School dashboard announcement</label>
+    <textarea name="school_message" rows="4" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 mb-1" placeholder="Message shown to all schools on their dashboard (leave blank to hide)."><?= e($current['school_message'] ?? '') ?></textarea>
+    <p class="text-xs text-gray-500 mb-4">Shown to every school on their dashboard. Leave empty to remove it.</p>
+
     <button class="bg-navy text-white rounded-lg px-5 py-2.5 font-medium min-h-[44px]">Save Settings</button>
   </form>
 </div>
