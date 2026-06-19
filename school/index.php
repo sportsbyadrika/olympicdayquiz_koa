@@ -50,7 +50,7 @@ require dirname(__DIR__) . '/includes/header.php';
         <tr>
           <th class="px-4 py-3">Started / Completed</th>
           <th class="px-4 py-3">Duration</th>
-          <th class="px-4 py-3">% Marks</th>
+          <th class="px-4 py-3">Rank</th>
           <th class="px-4 py-3">Status</th>
         </tr>
       </thead>
@@ -63,7 +63,7 @@ require dirname(__DIR__) . '/includes/header.php';
             <?php else: ?>—<?php endif; ?>
           </td>
           <td class="px-4 py-3 text-gray-600"><?= $r1['attempted'] ? e($r1['duration']) : '—' ?></td>
-          <td class="px-4 py-3 font-bold text-navy"><?= $r1['attempted'] ? number_format((float)$r1['pct'], 2) . '%' : '—' ?></td>
+          <td class="px-4 py-3 font-bold text-navy"><?= $r1['rank'] ? (int)$r1['rank'] : '—' ?></td>
           <td class="px-4 py-3"><span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium <?= $statusCls ?>"><?= e($r1['status']) ?></span></td>
         </tr>
       </tbody>

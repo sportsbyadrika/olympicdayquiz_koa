@@ -59,15 +59,14 @@ report_header("Final Report — Round {$roundNo}", "Ranked by percentage, then t
       <th style="width:48px">Rank</th>
       <th>School</th>
       <th style="width:70px">Code</th>
-      <th style="width:150px">Started / Completed</th>
-      <th style="width:80px">Duration</th>
-      <th style="width:70px">% Marks</th>
-      <th style="width:90px">Status</th>
+      <th style="width:160px">Started / Completed</th>
+      <th style="width:90px">Duration</th>
+      <th style="width:100px">Status</th>
     </tr>
   </thead>
   <tbody>
     <?php if (!$rows): ?>
-      <tr><td colspan="7" style="text-align:center;color:#9ca3af">No results recorded.</td></tr>
+      <tr><td colspan="6" style="text-align:center;color:#9ca3af">No results recorded.</td></tr>
     <?php endif; ?>
     <?php foreach ($rows as $i => $r): $rank = $i + 1; $qualified = $rank <= $topN; ?>
       <tr<?= $qualified ? ' style="background:#E8F5F3"' : '' ?>>
@@ -79,7 +78,6 @@ report_header("Final Report — Round {$roundNo}", "Ranked by percentage, then t
           <?= $r['session_end'] ? e(date('d M Y, H:i:s', strtotime((string)$r['session_end']))) : '—' ?>
         </td>
         <td><?= e(dur_str($r['session_start'] ?? null, $r['session_end'] ?? null)) ?></td>
-        <td><?= number_format((float)$r['pct'], 2) ?>%</td>
         <td><?= $qualified ? '<strong style="color:#00897B">Qualified</strong>' : 'Not Qualified' ?></td>
       </tr>
     <?php endforeach; ?>
