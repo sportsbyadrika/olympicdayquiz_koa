@@ -101,8 +101,13 @@ $perPage = 15;
 $where = '1=1';
 $params = [];
 if ($fQ !== '') {
-    $where .= ' AND (question_text LIKE :q OR option_a LIKE :q OR option_b LIKE :q OR option_c LIKE :q OR option_d LIKE :q)';
-    $params[':q'] = '%' . $fQ . '%';
+    $where .= ' AND (question_text LIKE :q1 OR option_a LIKE :q2 OR option_b LIKE :q3 OR option_c LIKE :q4 OR option_d LIKE :q5)';
+    $like = '%' . $fQ . '%';
+    $params[':q1'] = $like;
+    $params[':q2'] = $like;
+    $params[':q3'] = $like;
+    $params[':q4'] = $like;
+    $params[':q5'] = $like;
 }
 if (in_array($fRound, ['round1','round2','either'], true)) { $where .= ' AND suggested_round = :r'; $params[':r'] = $fRound; }
 if (in_array($fDiff, ['Easy','Medium','Hard'], true)) { $where .= ' AND difficulty = :diff'; $params[':diff'] = $fDiff; }
