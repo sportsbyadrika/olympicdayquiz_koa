@@ -154,6 +154,7 @@ require dirname(__DIR__) . '/includes/header.php';
       <h2 class="font-semibold text-navy text-lg">Round <?= $rno ?> Results</h2>
       <div class="flex gap-2">
         <a href="<?= e(BASE_URL) ?>/reports/round_results.php?round=<?= $rno ?>" target="_blank" class="bg-white border border-navy text-navy rounded-lg px-4 py-2 text-sm font-medium">Print Report</a>
+        <a href="<?= e(BASE_URL) ?>/reports/final_round1.php?round=<?= $rno ?>" target="_blank" class="bg-white border border-teal text-teal rounded-lg px-4 py-2 text-sm font-medium">Final Report Round <?= $rno ?></a>
         <?php if ($results && !$allDeclared): ?>
           <form method="post" onsubmit="return confirm('Declare Round <?= $rno ?> results to all schools?');">
             <?= csrf_field() ?>
