@@ -25,6 +25,19 @@ require dirname(__DIR__) . '/includes/header.php';
   · Participants: <?= e($school['participant1_name'] ?: '—') ?><?= $school['participant2_name'] ? ' &amp; ' . e($school['participant2_name']) : '' ?>
 </p>
 
+<?php $announcement = trim((string) setting('school_message', '')); ?>
+<?php if ($announcement !== ''): ?>
+  <div class="bg-teal/10 border border-teal/30 rounded-xl p-4 mb-6">
+    <div class="flex items-start gap-3">
+      <span class="text-xl">📢</span>
+      <div>
+        <div class="font-semibold text-navy text-sm mb-1">Announcement</div>
+        <div class="text-sm text-gray-700 whitespace-pre-line"><?= e($announcement) ?></div>
+      </div>
+    </div>
+  </div>
+<?php endif; ?>
+
 <h2 class="font-semibold text-navy mb-3">Your Quiz Slots</h2>
 
 <?php if (!$slots): ?>
