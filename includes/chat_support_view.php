@@ -64,8 +64,8 @@ require dirname(__DIR__) . '/includes/header.php';
   function loadThreads() {
     fetch(API + '?action=threads', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
       .then(r => r.json()).then(d => {
-        if (!d.ok) return;
         const list = document.getElementById('threadList');
+        if (!d.ok) { list.innerHTML = '<div class="p-4 text-sm text-red-600">' + esc(d.error || 'Could not load.') + '</div>'; return; }
         if (!d.threads.length) { list.innerHTML = '<div class="p-4 text-sm text-gray-400">No conversations yet.</div>'; return; }
         list.innerHTML = d.threads.map(t =>
           '<button type="button" class="threadItem w-full text-left px-4 py-3 hover:bg-lightgrey ' + (t.thread_id === currentThread ? 'bg-lightgrey' : '') + '" data-id="' + t.thread_id + '" data-name="' + esc(t.school) + '">'
@@ -79,7 +79,9 @@ require dirname(__DIR__) . '/includes/header.php';
         document.querySelectorAll('.threadItem').forEach(b => {
           b.addEventListener('click', () => openThread(parseInt(b.dataset.id, 10), b.dataset.name));
         });
-      }).catch(() => {});
+      }).catch(() => {
+        document.getElementById('threadList').innerHTML = '<div class="p-4 text-sm text-red-600">Could not load conversations. Please retry.</div>';
+      });
   }
 
   function openThread(id, name) {

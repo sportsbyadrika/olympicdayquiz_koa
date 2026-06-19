@@ -51,11 +51,16 @@ require dirname(__DIR__) . '/includes/header.php';
   function poll() {
     fetch(API + '?action=fetch&after_id=' + lastId, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
       .then(r => r.json()).then(d => {
-        if (!d.ok) return;
+        if (!d.ok) {
+          if (lastId === 0) box.innerHTML = '<div class="text-center text-sm text-red-600">' + esc(d.error || 'Chat is unavailable.') + '</div>';
+          return;
+        }
         if (lastId === 0) box.innerHTML = ''; // clear "Loading…" on first load
         append(d.messages);
         if (lastId === 0 && !d.messages.length) box.innerHTML = '<div class="text-center text-sm text-gray-400">No messages yet. Say hello!</div>';
-      }).catch(() => {});
+      }).catch(() => {
+        if (lastId === 0) box.innerHTML = '<div class="text-center text-sm text-red-600">Could not load chat. Please retry.</div>';
+      });
   }
 
   document.getElementById('chatForm').addEventListener('submit', function (ev) {
