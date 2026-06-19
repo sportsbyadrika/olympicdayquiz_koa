@@ -167,7 +167,7 @@ require dirname(__DIR__) . '/includes/header.php';
     ev.stopPropagation();
     const id = btn.dataset.id;
     post({action:'toggle_cancel', slot_id:SLOT_ID, question_id:id}).then(r=>{
-      if (!r.ok) return;
+      if (!r.ok) { alert(r.error || 'Could not update the question.'); return; }
       const card = btn.closest('.qcard');
       const title = card.querySelector('.text-sm');
       const meta = card.querySelector('.text-xs');

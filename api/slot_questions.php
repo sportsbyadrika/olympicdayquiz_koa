@@ -57,6 +57,9 @@ try {
             $pdo->commit();
         }
     } elseif ($action === 'toggle_cancel') {
+        if (!db_column_exists('slot_questions', 'cancelled')) {
+            json_response(['ok' => false, 'error' => 'Question cancellation needs a database update. Please run database/migrations/2026_06_slot_question_cancel.sql.'], 200);
+        }
         db()->prepare('UPDATE slot_questions SET cancelled = 1 - cancelled WHERE slot_id=? AND question_id=?')
             ->execute([$slotId, $questionId]);
         $cs = db()->prepare('SELECT cancelled FROM slot_questions WHERE slot_id=? AND question_id=?');
