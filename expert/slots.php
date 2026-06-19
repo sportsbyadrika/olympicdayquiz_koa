@@ -174,6 +174,7 @@ require dirname(__DIR__) . '/includes/header.php';
         <div class="flex flex-wrap gap-2 mt-4">
           <a href="<?= e(BASE_URL) ?>/expert/slots.php?slot_id=<?= (int)$s['id'] ?>#assign" class="text-sm bg-white border border-navy text-navy rounded-lg px-3 py-1.5">Assign Schools</a>
           <a href="<?= e(BASE_URL) ?>/expert/assign_questions.php?slot_id=<?= (int)$s['id'] ?>" class="text-sm bg-teal text-white rounded-lg px-3 py-1.5">Assign Questions</a>
+          <a href="<?= e(BASE_URL) ?>/reports/slot_questions.php?slot_id=<?= (int)$s['id'] ?>" target="_blank" rel="noopener" class="text-sm bg-white border border-gray-300 text-gray-700 rounded-lg px-3 py-1.5">Print Questions</a>
         </div>
       </div>
     <?php endforeach; ?>
