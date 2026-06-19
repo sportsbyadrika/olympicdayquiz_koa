@@ -101,10 +101,13 @@ require dirname(__DIR__) . '/includes/header.php';
       <?php foreach ($assigned as $q): $isCancelled = (int)($q['cancelled'] ?? 0) === 1; ?>
         <li class="qcard bg-white rounded-lg border <?= $isCancelled ? 'border-red-300 bg-red-50' : 'border-teal/30' ?> p-3 cursor-move" data-id="<?= (int)$q['id'] ?>">
           <div class="flex items-start justify-between gap-2">
-            <div class="text-sm font-medium <?= $isCancelled ? 'text-red-700 line-through' : 'text-navy' ?>"><?= e(mb_strimwidth($q['question_text'],0,90,'…')) ?></div>
+            <div class="flex items-start gap-2 min-w-0">
+              <span class="slno shrink-0 text-xs font-semibold text-gray-500 mt-0.5"></span>
+              <div class="text-sm font-medium <?= $isCancelled ? 'text-red-700 line-through' : 'text-navy' ?>"><?= e(mb_strimwidth($q['question_text'],0,90,'…')) ?></div>
+            </div>
             <button type="button" class="cancelBtn no-drag shrink-0 text-xs <?= $isCancelled ? 'text-teal' : 'text-red-600' ?> hover:underline" data-id="<?= (int)$q['id'] ?>"><?= $isCancelled ? 'Restore' : 'Cancel' ?></button>
           </div>
-          <div class="text-xs text-gray-400 mt-1"><?= e(ucfirst($q['suggested_round'])) ?> · <?= e($q['difficulty']) ?><?= $isCancelled ? ' · <span class="text-red-600 font-medium">CANCELLED</span>' : '' ?></div>
+          <div class="text-xs text-gray-400 mt-1 pl-5"><?= e(ucfirst($q['suggested_round'])) ?> · <?= e($q['difficulty']) ?><?= $isCancelled ? ' · <span class="text-red-600 font-medium">CANCELLED</span>' : '' ?></div>
         </li>
       <?php endforeach; ?>
     </ul>
@@ -144,11 +147,21 @@ require dirname(__DIR__) . '/includes/header.php';
   const bankEl=document.getElementById('bankList');
   const slotEl=document.getElementById('slotList');
 
+  // Keep the serial numbers in the slot list in sync with the order.
+  function renumberSlot(){
+    [...slotEl.querySelectorAll('.qcard')].forEach((li, i) => {
+      const s = li.querySelector('.slno');
+      if (s) s.textContent = (i + 1) + '.';
+    });
+  }
+  renumberSlot();
+
   new Sortable(bankEl,{group:'questions',animation:150,scroll:true,bubbleScroll:true,scrollSensitivity:60,scrollSpeed:12,
     onAdd:function(evt){
       // Card moved from slot back to bank => remove from slot.
       const id=evt.item.dataset.id;
       post({action:'remove',slot_id:SLOT_ID,question_id:id}).then(r=>{ if(r.ok) updateCount(r.count); });
+      renumberSlot();
     }
   });
   new Sortable(slotEl,{group:'questions',animation:150,scroll:true,bubbleScroll:true,scrollSensitivity:60,scrollSpeed:12,
@@ -156,8 +169,9 @@ require dirname(__DIR__) . '/includes/header.php';
     onAdd:function(evt){
       const id=evt.item.dataset.id;
       post({action:'add',slot_id:SLOT_ID,question_id:id}).then(r=>{ if(r.ok){ updateCount(r.count); sendReorder(); } });
+      renumberSlot();
     },
-    onUpdate:function(){ sendReorder(); }
+    onUpdate:function(){ sendReorder(); renumberSlot(); }
   });
 
   // Cancel / restore a question within the slot.
@@ -167,7 +181,7 @@ require dirname(__DIR__) . '/includes/header.php';
     ev.stopPropagation();
     const id = btn.dataset.id;
     post({action:'toggle_cancel', slot_id:SLOT_ID, question_id:id}).then(r=>{
-      if (!r.ok) return;
+      if (!r.ok) { alert(r.error || 'Could not update the question.'); return; }
       const card = btn.closest('.qcard');
       const title = card.querySelector('.text-sm');
       const meta = card.querySelector('.text-xs');
