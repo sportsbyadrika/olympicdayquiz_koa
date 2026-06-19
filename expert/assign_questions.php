@@ -28,9 +28,10 @@ if ($fSource === 'association') { $where .= ' AND qm.source_association_id IS NO
 elseif ($fSource === 'expert') { $where .= ' AND qm.source_association_id IS NULL'; }
 
 // Questions already in this slot.
+$cancelSel = db_column_exists('slot_questions', 'cancelled') ? 'sq.cancelled' : '0 AS cancelled';
 $assignedStmt = db()->prepare(
-    'SELECT qm.*, sq.cancelled FROM slot_questions sq JOIN questions_master qm ON qm.id=sq.question_id
-     WHERE sq.slot_id=? ORDER BY sq.sequence_no'
+    "SELECT qm.*, $cancelSel FROM slot_questions sq JOIN questions_master qm ON qm.id=sq.question_id
+     WHERE sq.slot_id=? ORDER BY sq.sequence_no"
 );
 $assignedStmt->execute([$slotId]);
 $assigned = $assignedStmt->fetchAll();

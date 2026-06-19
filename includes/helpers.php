@@ -70,6 +70,26 @@ function client_ip(): string
     return $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
 }
 
+/** True if a column exists on a table (cached). Lets features degrade before migration. */
+function db_column_exists(string $table, string $column): bool
+{
+    static $cache = [];
+    $key = $table . '.' . $column;
+    if (array_key_exists($key, $cache)) {
+        return $cache[$key];
+    }
+    try {
+        $st = db()->prepare(
+            'SELECT 1 FROM information_schema.columns
+             WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ? LIMIT 1'
+        );
+        $st->execute([$table, $column]);
+        return $cache[$key] = (bool) $st->fetchColumn();
+    } catch (Throwable $e) {
+        return $cache[$key] = false;
+    }
+}
+
 /** Build an absolute URL to an app path (e.g. '/public/login.php'). */
 function app_url(string $path = ''): string
 {
