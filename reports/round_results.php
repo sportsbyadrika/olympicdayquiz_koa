@@ -6,17 +6,22 @@ require_once __DIR__ . '/report_layout.php';
 
 $roundNo = int_val(get('round')) === 2 ? 2 : 1;
 
+$hasCancel = db_column_exists('slot_questions', 'cancelled');
+$c1 = $hasCancel ? 'AND sq.cancelled = 0' : '';
+$c2 = $hasCancel ? 'AND sq2.cancelled = 0' : '';
+$c3 = $hasCancel ? 'AND sq3.cancelled = 0' : '';
+
 $st = db()->prepare(
     "SELECT res.*, s.name AS school_name, s.code, sl.slot_name,
             qs.start_time AS session_start, qs.end_time AS session_end,
-            (SELECT COUNT(*) FROM slot_questions sq WHERE sq.slot_id = qs.slot_id AND sq.cancelled = 0) AS effective_total,
+            (SELECT COUNT(*) FROM slot_questions sq WHERE sq.slot_id = qs.slot_id $c1) AS effective_total,
             (SELECT COUNT(*) FROM responses rp
                 JOIN slot_questions sq2 ON sq2.slot_id = qs.slot_id AND sq2.question_id = rp.question_id
-                WHERE rp.session_id = qs.id AND rp.selected_option IS NOT NULL AND sq2.cancelled = 0) AS attended_after,
+                WHERE rp.session_id = qs.id AND rp.selected_option IS NOT NULL $c2) AS attended_after,
             (SELECT COUNT(*) FROM responses rp
                 JOIN questions_master qmm ON qmm.id = rp.question_id
                 JOIN slot_questions sq3 ON sq3.slot_id = qs.slot_id AND sq3.question_id = rp.question_id
-                WHERE rp.session_id = qs.id AND rp.selected_option = qmm.correct_option AND sq3.cancelled = 0) AS score_after
+                WHERE rp.session_id = qs.id AND rp.selected_option = qmm.correct_option $c3) AS score_after
      FROM rounds r
      JOIN results res ON res.round_id = r.id
      JOIN schools s ON s.id = res.school_id
