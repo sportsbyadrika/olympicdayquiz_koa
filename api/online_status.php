@@ -110,14 +110,14 @@ switch ($metric) {
 
     case 'not_logged_in':
         $title = 'Schools that have NOT logged in';
-        $headers = ['School', 'Code', 'Email'];
+        $headers = ['School', 'Code', 'Email', 'Contact'];
         $st = $pdo->query(
-            "SELECT s.name, s.code, u.email FROM schools s JOIN users u ON u.id = s.user_id
+            "SELECT s.name, s.code, u.email, s.contact FROM schools s JOIN users u ON u.id = s.user_id
              WHERE NOT EXISTS (SELECT 1 FROM audit_log a WHERE a.user_id = u.id AND a.action = 'login_success')
              ORDER BY s.name"
         );
         foreach ($st->fetchAll() as $r) {
-            $rows[] = [$r['name'], $r['code'], $r['email']];
+            $rows[] = [$r['name'], $r['code'], $r['email'], $r['contact'] ?? ''];
         }
         break;
 
