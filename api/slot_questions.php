@@ -56,6 +56,14 @@ try {
             }
             $pdo->commit();
         }
+    } elseif ($action === 'toggle_cancel') {
+        db()->prepare('UPDATE slot_questions SET cancelled = 1 - cancelled WHERE slot_id=? AND question_id=?')
+            ->execute([$slotId, $questionId]);
+        $cs = db()->prepare('SELECT cancelled FROM slot_questions WHERE slot_id=? AND question_id=?');
+        $cs->execute([$slotId, $questionId]);
+        $cancelled = (int) $cs->fetchColumn();
+        audit_log('slot_question_cancel', 'slot_questions', $slotId, 'q=' . $questionId . ' cancelled=' . $cancelled);
+        json_response(['ok' => true, 'cancelled' => $cancelled]);
     } else {
         json_response(['ok' => false, 'error' => 'Unknown action.'], 422);
     }

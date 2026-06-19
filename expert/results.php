@@ -68,20 +68,46 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 function round_results(int $roundNo): array
 {
     $st = db()->prepare(
-        'SELECT res.*, s.name AS school_name, s.code, r.id AS round_id,
+        "SELECT res.*, s.name AS school_name, s.code, r.id AS round_id,
                 sl.slot_name, qs.status AS session_status,
                 qs.start_time AS session_start, qs.end_time AS session_end,
-                (SELECT COUNT(*) FROM responses rsp WHERE rsp.session_id = res.session_id AND rsp.selected_option IS NOT NULL) AS attended
+                (SELECT COUNT(*) FROM responses rsp WHERE rsp.session_id = res.session_id AND rsp.selected_option IS NOT NULL) AS attended,
+                -- counts after cancellation (cancelled questions excluded):
+                (SELECT COUNT(*) FROM slot_questions sq WHERE sq.slot_id = qs.slot_id AND sq.cancelled = 0) AS effective_total,
+                (SELECT COUNT(*) FROM responses rp
+                    JOIN slot_questions sq2 ON sq2.slot_id = qs.slot_id AND sq2.question_id = rp.question_id
+                    WHERE rp.session_id = qs.id AND rp.selected_option IS NOT NULL AND sq2.cancelled = 0) AS attended_after,
+                (SELECT COUNT(*) FROM responses rp
+                    JOIN questions_master qmm ON qmm.id = rp.question_id
+                    JOIN slot_questions sq3 ON sq3.slot_id = qs.slot_id AND sq3.question_id = rp.question_id
+                    WHERE rp.session_id = qs.id AND rp.selected_option = qmm.correct_option AND sq3.cancelled = 0) AS score_after
          FROM rounds r
          JOIN results res ON res.round_id = r.id
          JOIN schools s ON s.id = res.school_id
          LEFT JOIN quiz_sessions qs ON qs.id = res.session_id
          LEFT JOIN slots sl ON sl.id = qs.slot_id
-         WHERE r.round_no = ?
-         ORDER BY res.score DESC, s.name'
+         WHERE r.round_no = ?"
     );
     $st->execute([$roundNo]);
-    return $st->fetchAll();
+    $rows = $st->fetchAll();
+
+    // Derive percentage and duration, then rank by % desc, faster duration first.
+    foreach ($rows as &$row) {
+        $eff = (int) $row['effective_total'];
+        $row['pct'] = $eff > 0 ? round((int) $row['score_after'] / $eff * 100, 2) : 0.0;
+        $row['duration_secs'] = ($row['session_start'] && $row['session_end'])
+            ? max(0, strtotime((string) $row['session_end']) - strtotime((string) $row['session_start']))
+            : PHP_INT_MAX; // no/!complete attempt sorts last on the tie-break
+    }
+    unset($row);
+
+    usort($rows, function ($a, $b) {
+        if ($b['pct'] <=> $a['pct']) {
+            return $b['pct'] <=> $a['pct']; // higher percentage first
+        }
+        return $a['duration_secs'] <=> $b['duration_secs']; // faster first
+    });
+    return $rows;
 }
 
 function round_id_by_no(int $no): int
@@ -149,6 +175,9 @@ require dirname(__DIR__) . '/includes/header.php';
               <th class="px-4 py-3">Duration</th>
               <th class="px-4 py-3">Attended</th>
               <th class="px-4 py-3">Score</th>
+              <th class="px-4 py-3">Att. (after cancel)</th>
+              <th class="px-4 py-3">Score (after cancel)</th>
+              <th class="px-4 py-3">%</th>
               <th class="px-4 py-3">Status</th>
               <?php if ($rno === 1): ?><th class="px-4 py-3">Qualify R2</th><?php endif; ?>
               <th class="px-4 py-3">Declared</th>
@@ -168,6 +197,9 @@ require dirname(__DIR__) . '/includes/header.php';
                 <td class="px-4 py-3 text-gray-600 whitespace-nowrap"><?= e(fmt_duration($r['session_start'] ?? null, $r['session_end'] ?? null)) ?></td>
                 <td class="px-4 py-3 text-gray-600"><?= (int)$r['attended'] ?> / <?= (int)$r['total_questions'] ?></td>
                 <td class="px-4 py-3 font-semibold"><?= (int)$r['score'] ?> / <?= (int)$r['total_questions'] ?></td>
+                <td class="px-4 py-3 text-gray-600"><?= (int)$r['attended_after'] ?> / <?= (int)$r['effective_total'] ?></td>
+                <td class="px-4 py-3 font-semibold text-teal"><?= (int)$r['score_after'] ?> / <?= (int)$r['effective_total'] ?></td>
+                <td class="px-4 py-3 font-bold text-navy"><?= number_format((float)$r['pct'], 2) ?>%</td>
                 <td class="px-4 py-3"><?= status_badge($r['session_status'] ?? 'pending') ?></td>
                 <?php if ($rno === 1): ?>
                   <td class="px-4 py-3">

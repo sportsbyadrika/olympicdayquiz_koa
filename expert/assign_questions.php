@@ -29,7 +29,7 @@ elseif ($fSource === 'expert') { $where .= ' AND qm.source_association_id IS NUL
 
 // Questions already in this slot.
 $assignedStmt = db()->prepare(
-    'SELECT qm.* FROM slot_questions sq JOIN questions_master qm ON qm.id=sq.question_id
+    'SELECT qm.*, sq.cancelled FROM slot_questions sq JOIN questions_master qm ON qm.id=sq.question_id
      WHERE sq.slot_id=? ORDER BY sq.sequence_no'
 );
 $assignedStmt->execute([$slotId]);
@@ -97,14 +97,17 @@ require dirname(__DIR__) . '/includes/header.php';
   <div class="lg:sticky lg:top-20">
     <h2 class="font-semibold text-navy mb-2">In this Slot</h2>
     <ul id="slotList" class="space-y-2 min-h-[120px] max-h-[65vh] overflow-y-auto bg-teal/5 rounded-xl p-3 border border-dashed border-teal/40">
-      <?php foreach ($assigned as $q): ?>
-        <li class="qcard bg-white rounded-lg border border-teal/30 p-3 cursor-move" data-id="<?= (int)$q['id'] ?>">
-          <div class="text-sm font-medium text-navy"><?= e(mb_strimwidth($q['question_text'],0,90,'…')) ?></div>
-          <div class="text-xs text-gray-400 mt-1"><?= e(ucfirst($q['suggested_round'])) ?> · <?= e($q['difficulty']) ?></div>
+      <?php foreach ($assigned as $q): $isCancelled = (int)($q['cancelled'] ?? 0) === 1; ?>
+        <li class="qcard bg-white rounded-lg border <?= $isCancelled ? 'border-red-300 bg-red-50' : 'border-teal/30' ?> p-3 cursor-move" data-id="<?= (int)$q['id'] ?>">
+          <div class="flex items-start justify-between gap-2">
+            <div class="text-sm font-medium <?= $isCancelled ? 'text-red-700 line-through' : 'text-navy' ?>"><?= e(mb_strimwidth($q['question_text'],0,90,'…')) ?></div>
+            <button type="button" class="cancelBtn no-drag shrink-0 text-xs <?= $isCancelled ? 'text-teal' : 'text-red-600' ?> hover:underline" data-id="<?= (int)$q['id'] ?>"><?= $isCancelled ? 'Restore' : 'Cancel' ?></button>
+          </div>
+          <div class="text-xs text-gray-400 mt-1"><?= e(ucfirst($q['suggested_round'])) ?> · <?= e($q['difficulty']) ?><?= $isCancelled ? ' · <span class="text-red-600 font-medium">CANCELLED</span>' : '' ?></div>
         </li>
       <?php endforeach; ?>
     </ul>
-    <p class="text-xs text-gray-400 mt-2">Drag a card back to the bank to remove it from the slot.</p>
+    <p class="text-xs text-gray-400 mt-2">Drag a card back to the bank to remove it. Use <span class="text-red-600">Cancel</span> to void a wrong question (it stays for past attempts but is excluded from scoring after cancellation).</p>
   </div>
 </div>
 
@@ -148,11 +151,35 @@ require dirname(__DIR__) . '/includes/header.php';
     }
   });
   new Sortable(slotEl,{group:'questions',animation:150,scroll:true,bubbleScroll:true,scrollSensitivity:60,scrollSpeed:12,
+    filter:'.no-drag', preventOnFilter:false,
     onAdd:function(evt){
       const id=evt.item.dataset.id;
       post({action:'add',slot_id:SLOT_ID,question_id:id}).then(r=>{ if(r.ok){ updateCount(r.count); sendReorder(); } });
     },
     onUpdate:function(){ sendReorder(); }
+  });
+
+  // Cancel / restore a question within the slot.
+  slotEl.addEventListener('click', function(ev){
+    const btn = ev.target.closest('.cancelBtn');
+    if (!btn) return;
+    ev.stopPropagation();
+    const id = btn.dataset.id;
+    post({action:'toggle_cancel', slot_id:SLOT_ID, question_id:id}).then(r=>{
+      if (!r.ok) return;
+      const card = btn.closest('.qcard');
+      const title = card.querySelector('.text-sm');
+      const meta = card.querySelector('.text-xs');
+      if (r.cancelled) {
+        card.classList.add('border-red-300','bg-red-50'); card.classList.remove('border-teal/30');
+        title.classList.add('text-red-700','line-through'); title.classList.remove('text-navy');
+        btn.textContent = 'Restore'; btn.classList.add('text-teal'); btn.classList.remove('text-red-600');
+      } else {
+        card.classList.remove('border-red-300','bg-red-50'); card.classList.add('border-teal/30');
+        title.classList.remove('text-red-700','line-through'); title.classList.add('text-navy');
+        btn.textContent = 'Cancel'; btn.classList.remove('text-teal'); btn.classList.add('text-red-600');
+      }
+    });
   });
 </script>
 
