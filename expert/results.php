@@ -39,7 +39,8 @@ function round_results(int $roundNo): array
 {
     $st = db()->prepare(
         'SELECT res.*, s.name AS school_name, s.code, r.id AS round_id,
-                sl.slot_name, qs.status AS session_status
+                sl.slot_name, qs.status AS session_status,
+                qs.start_time AS session_start, qs.end_time AS session_end
          FROM rounds r
          JOIN results res ON res.round_id = r.id
          JOIN schools s ON s.id = res.school_id
@@ -57,6 +58,21 @@ function round_id_by_no(int $no): int
     $st = db()->prepare('SELECT id FROM rounds WHERE round_no=?');
     $st->execute([$no]);
     return (int) $st->fetchColumn();
+}
+
+/** Human-friendly duration between two datetimes, or '—'. */
+function fmt_duration(?string $start, ?string $end): string
+{
+    if (!$start || !$end) {
+        return '—';
+    }
+    $secs = strtotime($end) - strtotime($start);
+    if ($secs < 0) {
+        return '—';
+    }
+    $m = intdiv($secs, 60);
+    $s = $secs % 60;
+    return $m . 'm ' . $s . 's';
 }
 
 $pageTitle = 'Results';
@@ -98,6 +114,9 @@ require dirname(__DIR__) . '/includes/header.php';
               <th class="px-4 py-3">#</th>
               <th class="px-4 py-3">School</th>
               <th class="px-4 py-3">Slot</th>
+              <th class="px-4 py-3">Started</th>
+              <th class="px-4 py-3">Completed</th>
+              <th class="px-4 py-3">Duration</th>
               <th class="px-4 py-3">Score</th>
               <th class="px-4 py-3">Status</th>
               <?php if ($rno === 1): ?><th class="px-4 py-3">Qualify R2</th><?php endif; ?>
@@ -110,6 +129,9 @@ require dirname(__DIR__) . '/includes/header.php';
                 <td class="px-4 py-3 text-gray-400"><?= $i + 1 ?></td>
                 <td class="px-4 py-3 font-medium text-navy"><?= e($r['school_name']) ?> <span class="text-xs text-gray-400">(<?= e($r['code']) ?>)</span></td>
                 <td class="px-4 py-3 text-gray-600"><?= e($r['slot_name'] ?? '—') ?></td>
+                <td class="px-4 py-3 text-gray-600 whitespace-nowrap"><?= $r['session_start'] ? e(date('d M, H:i:s', strtotime((string)$r['session_start']))) : '—' ?></td>
+                <td class="px-4 py-3 text-gray-600 whitespace-nowrap"><?= $r['session_end'] ? e(date('d M, H:i:s', strtotime((string)$r['session_end']))) : '—' ?></td>
+                <td class="px-4 py-3 text-gray-600 whitespace-nowrap"><?= e(fmt_duration($r['session_start'] ?? null, $r['session_end'] ?? null)) ?></td>
                 <td class="px-4 py-3 font-semibold"><?= (int)$r['score'] ?> / <?= (int)$r['total_questions'] ?></td>
                 <td class="px-4 py-3"><?= status_badge($r['session_status'] ?? 'pending') ?></td>
                 <?php if ($rno === 1): ?>
