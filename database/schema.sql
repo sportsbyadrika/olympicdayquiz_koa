@@ -271,6 +271,7 @@ CREATE TABLE IF NOT EXISTS slot_questions (
   slot_id      INT UNSIGNED NOT NULL,
   question_id  INT UNSIGNED NOT NULL,
   sequence_no  INT UNSIGNED NOT NULL DEFAULT 1,
+  cancelled    TINYINT(1) NOT NULL DEFAULT 0,
   created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_slot_question (slot_id, question_id),
