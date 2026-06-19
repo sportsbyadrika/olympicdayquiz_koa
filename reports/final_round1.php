@@ -51,6 +51,50 @@ foreach ($rows as &$row) {
 unset($row);
 usort($rows, fn($a, $b) => ($b['pct'] <=> $a['pct']) ?: ($a['duration_secs'] <=> $b['duration_secs']));
 
+// ----- Send result emails (one per school, to its registered email) -----
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && post('action') === 'send_email') {
+    csrf_check();
+    $sendResults = [];
+    foreach ($rows as $i => $r) {
+        $rank = $i + 1;
+        $status = $rank <= $topN ? 'Qualified' : 'Not Qualified';
+        $to = trim((string) ($r['email'] ?? ''));
+        $name = (string) $r['school_name'];
+
+        if ($to === '' || !is_email($to)) {
+            $sendResults[] = ['school' => $name, 'email' => $to, 'state' => 'No valid email'];
+            continue;
+        }
+        $html = '<div style="font-family:Arial,sans-serif;color:#333;font-size:14px;line-height:1.6">'
+            . 'Hi Team, 👋<br><br>'
+            . 'The results for the Preliminary Round Quiz Competition (part of Olympic Day Events - 2026) have been published in the WhatsApp group! 🎉<br>'
+            . 'Here are the details for your school:<br><br>'
+            . '<b>School Name:</b> ' . e($name) . '<br>'
+            . '<b>School Code:</b> ' . e((string) $r['code']) . '<br>'
+            . '<b>Participant 1 :</b> ' . e((string) $r['participant1_name']) . '<br>'
+            . '<b>Participant 2 :</b> ' . e((string) $r['participant2_name']) . '<br>'
+            . '<b>Rank Obtained:</b> ' . $rank . '<br>'
+            . '<b>Final Round Status:</b> ' . e($status) . '<br><br>'
+            . 'Regards,<br>Admin</div>';
+        $sent = send_email($to, $name, 'Preliminary Round Results — Olympic Day Events 2026', $html);
+        $sendResults[] = ['school' => $name, 'email' => $to, 'state' => $sent ? 'Sent' : 'Failed'];
+        audit_log($sent ? 'final_result_email_sent' : 'final_result_email_failed', 'schools', null, $to);
+    }
+
+    $okCount = count(array_filter($sendResults, fn($x) => $x['state'] === 'Sent'));
+    report_header("Email Send Results — Round {$roundNo}", "{$okCount} of " . count($sendResults) . ' email(s) sent successfully');
+    echo '<p style="margin-bottom:14px"><a href="' . e(app_url('/reports/final_round1.php?round=' . $roundNo . '&top=' . $topN)) . '" style="color:#00897B">&larr; Back to report</a></p>';
+    echo '<table><thead><tr><th>School</th><th>Email</th><th style="width:120px">Result</th></tr></thead><tbody>';
+    foreach ($sendResults as $sr) {
+        $color = $sr['state'] === 'Sent' ? '#067647' : ($sr['state'] === 'Failed' ? '#b42318' : '#888');
+        echo '<tr><td>' . e($sr['school']) . '</td><td>' . e($sr['email'] ?: '—') . '</td>'
+            . '<td style="color:' . $color . ';font-weight:600">' . e($sr['state']) . '</td></tr>';
+    }
+    echo '</tbody></table>';
+    report_footer();
+    exit;
+}
+
 // CSV export (same ranking) — must run before any HTML output.
 if (get('format') === 'csv') {
     header('Content-Type: text/csv; charset=utf-8');
@@ -71,7 +115,13 @@ if (get('format') === 'csv') {
 $csvBtn = '<a href="' . e(app_url('/reports/final_round1.php?round=' . $roundNo . '&top=' . $topN . '&format=csv'))
     . '" class="bg-white text-[#1A2B49] rounded px-4 py-2 text-sm font-semibold">Download CSV</a>';
 
-report_header("Final Report — Round {$roundNo}", "Ranked by percentage, then time taken · top {$topN} qualify", $csvBtn);
+$sendBtn = '<form method="post" style="display:inline" onsubmit="return confirm(\'Send the result email to every school\\\'s registered email address?\');">'
+    . csrf_field()
+    . '<input type="hidden" name="action" value="send_email">'
+    . '<button type="submit" class="bg-white text-[#1A2B49] rounded px-4 py-2 text-sm font-semibold">Send email</button>'
+    . '</form>';
+
+report_header("Final Report — Round {$roundNo}", "Ranked by percentage, then time taken · top {$topN} qualify", $csvBtn . $sendBtn);
 ?>
 <table>
   <thead>
