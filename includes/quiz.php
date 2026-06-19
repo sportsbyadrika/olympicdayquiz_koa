@@ -208,14 +208,59 @@ function result_declared(int $schoolId, int $roundId): bool
 }
 
 /**
+ * Rankings for a round: [school_id => rank], ordered by percentage after
+ * cancellation (desc), then time taken (asc). Only attempted teams are ranked.
+ */
+function round_rankings(int $roundNo): array
+{
+    $rs = db()->prepare('SELECT id FROM rounds WHERE round_no = ?');
+    $rs->execute([$roundNo]);
+    $roundId = (int) $rs->fetchColumn();
+    if (!$roundId) {
+        return [];
+    }
+    $hasCancel = function_exists('db_column_exists') && db_column_exists('slot_questions', 'cancelled');
+    $c1 = $hasCancel ? 'AND sq.cancelled = 0' : '';
+    $c3 = $hasCancel ? 'AND sq3.cancelled = 0' : '';
+
+    $st = db()->prepare(
+        "SELECT res.school_id, qs.start_time, qs.end_time,
+            (SELECT COUNT(*) FROM slot_questions sq WHERE sq.slot_id = qs.slot_id $c1) AS eff,
+            (SELECT COUNT(*) FROM responses rp
+                JOIN questions_master qmm ON qmm.id = rp.question_id
+                JOIN slot_questions sq3 ON sq3.slot_id = qs.slot_id AND sq3.question_id = rp.question_id
+                WHERE rp.session_id = qs.id AND rp.selected_option = qmm.correct_option $c3) AS score_after
+         FROM results res
+         JOIN quiz_sessions qs ON qs.id = res.session_id
+         WHERE res.round_id = ?"
+    );
+    $st->execute([$roundId]);
+    $rows = $st->fetchAll();
+    foreach ($rows as &$r) {
+        $eff = (int) $r['eff'];
+        $r['pct'] = $eff > 0 ? $r['score_after'] / $eff : 0;
+        $r['dur'] = ($r['start_time'] && $r['end_time'])
+            ? max(0, strtotime((string) $r['end_time']) - strtotime((string) $r['start_time'])) : PHP_INT_MAX;
+    }
+    unset($r);
+    usort($rows, fn($a, $b) => ($b['pct'] <=> $a['pct']) ?: ($a['dur'] <=> $b['dur']));
+
+    $ranks = [];
+    foreach ($rows as $i => $r) {
+        $ranks[(int) $r['school_id']] = $i + 1;
+    }
+    return $ranks;
+}
+
+/**
  * Summary of a school's result for a round (for the school dashboard).
- * Percentage is based on score AFTER cancellation; raw scores are not exposed.
+ * Percentage is computed for internal ranking only and is NOT returned/shown.
  * Returns: attempted(bool), status('Qualified'|'Not Qualified'|'Absent'),
- * start, end, duration, pct.
+ * start, end, duration, rank(int|null).
  */
 function school_round_summary(int $schoolId, int $roundNo): array
 {
-    $out = ['attempted' => false, 'status' => 'Absent', 'start' => null, 'end' => null, 'duration' => '—', 'pct' => 0.0];
+    $out = ['attempted' => false, 'status' => 'Absent', 'start' => null, 'end' => null, 'duration' => '—', 'rank' => null];
 
     $rs = db()->prepare('SELECT id FROM rounds WHERE round_no = ?');
     $rs->execute([$roundNo]);
@@ -231,7 +276,6 @@ function school_round_summary(int $schoolId, int $roundNo): array
     $ss->execute([$schoolId, $roundId]);
     $sess = $ss->fetch();
 
-    // Qualification flag (independent of attempt).
     $qf = db()->prepare('SELECT qualified_for_next FROM results WHERE school_id = ? AND round_id = ? LIMIT 1');
     $qf->execute([$schoolId, $roundId]);
     $qualified = (int) $qf->fetchColumn() === 1;
@@ -239,23 +283,6 @@ function school_round_summary(int $schoolId, int $roundNo): array
     if (!$sess) {
         return $out; // Absent
     }
-
-    $slotId = (int) $sess['slot_id'];
-    $hasCancel = function_exists('db_column_exists') && db_column_exists('slot_questions', 'cancelled');
-    $cExpr = $hasCancel ? 'AND sq.cancelled = 0' : '';
-
-    $eff = db()->prepare("SELECT COUNT(*) FROM slot_questions sq WHERE sq.slot_id = ? $cExpr");
-    $eff->execute([$slotId]);
-    $effective = (int) $eff->fetchColumn();
-
-    $sc = db()->prepare(
-        "SELECT COUNT(*) FROM responses rp
-         JOIN questions_master qm ON qm.id = rp.question_id
-         JOIN slot_questions sq ON sq.slot_id = ? AND sq.question_id = rp.question_id
-         WHERE rp.session_id = ? AND rp.selected_option = qm.correct_option $cExpr"
-    );
-    $sc->execute([$slotId, (int) $sess['id']]);
-    $scoreAfter = (int) $sc->fetchColumn();
 
     $out['attempted'] = true;
     $out['status'] = $qualified ? 'Qualified' : 'Not Qualified';
@@ -265,6 +292,7 @@ function school_round_summary(int $schoolId, int $roundNo): array
         $secs = max(0, strtotime((string) $sess['end_time']) - strtotime((string) $sess['start_time']));
         $out['duration'] = intdiv($secs, 60) . 'm ' . ($secs % 60) . 's';
     }
-    $out['pct'] = $effective > 0 ? round($scoreAfter / $effective * 100, 2) : 0.0;
+    $ranks = round_rankings($roundNo);
+    $out['rank'] = $ranks[$schoolId] ?? null;
     return $out;
 }
