@@ -206,3 +206,65 @@ function result_declared(int $schoolId, int $roundId): bool
     $st->execute([$schoolId, $roundId]);
     return (bool) $st->fetchColumn();
 }
+
+/**
+ * Summary of a school's result for a round (for the school dashboard).
+ * Percentage is based on score AFTER cancellation; raw scores are not exposed.
+ * Returns: attempted(bool), status('Qualified'|'Not Qualified'|'Absent'),
+ * start, end, duration, pct.
+ */
+function school_round_summary(int $schoolId, int $roundNo): array
+{
+    $out = ['attempted' => false, 'status' => 'Absent', 'start' => null, 'end' => null, 'duration' => '—', 'pct' => 0.0];
+
+    $rs = db()->prepare('SELECT id FROM rounds WHERE round_no = ?');
+    $rs->execute([$roundNo]);
+    $roundId = (int) $rs->fetchColumn();
+    if (!$roundId) {
+        return $out;
+    }
+
+    $ss = db()->prepare(
+        "SELECT * FROM quiz_sessions WHERE school_id = ? AND round_id = ?
+         AND status IN ('submitted','force_submitted') ORDER BY id DESC LIMIT 1"
+    );
+    $ss->execute([$schoolId, $roundId]);
+    $sess = $ss->fetch();
+
+    // Qualification flag (independent of attempt).
+    $qf = db()->prepare('SELECT qualified_for_next FROM results WHERE school_id = ? AND round_id = ? LIMIT 1');
+    $qf->execute([$schoolId, $roundId]);
+    $qualified = (int) $qf->fetchColumn() === 1;
+
+    if (!$sess) {
+        return $out; // Absent
+    }
+
+    $slotId = (int) $sess['slot_id'];
+    $hasCancel = function_exists('db_column_exists') && db_column_exists('slot_questions', 'cancelled');
+    $cExpr = $hasCancel ? 'AND sq.cancelled = 0' : '';
+
+    $eff = db()->prepare("SELECT COUNT(*) FROM slot_questions sq WHERE sq.slot_id = ? $cExpr");
+    $eff->execute([$slotId]);
+    $effective = (int) $eff->fetchColumn();
+
+    $sc = db()->prepare(
+        "SELECT COUNT(*) FROM responses rp
+         JOIN questions_master qm ON qm.id = rp.question_id
+         JOIN slot_questions sq ON sq.slot_id = ? AND sq.question_id = rp.question_id
+         WHERE rp.session_id = ? AND rp.selected_option = qm.correct_option $cExpr"
+    );
+    $sc->execute([$slotId, (int) $sess['id']]);
+    $scoreAfter = (int) $sc->fetchColumn();
+
+    $out['attempted'] = true;
+    $out['status'] = $qualified ? 'Qualified' : 'Not Qualified';
+    $out['start'] = $sess['start_time'];
+    $out['end'] = $sess['end_time'];
+    if ($sess['start_time'] && $sess['end_time']) {
+        $secs = max(0, strtotime((string) $sess['end_time']) - strtotime((string) $sess['start_time']));
+        $out['duration'] = intdiv($secs, 60) . 'm ' . ($secs % 60) . 's';
+    }
+    $out['pct'] = $effective > 0 ? round($scoreAfter / $effective * 100, 2) : 0.0;
+    return $out;
+}

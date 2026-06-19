@@ -38,6 +38,39 @@ require dirname(__DIR__) . '/includes/header.php';
   </div>
 <?php endif; ?>
 
+<?php if ((string) setting('show_round1_to_school', '0') === '1'):
+  $r1 = school_round_summary($schoolId, 1);
+  $statusCls = $r1['status'] === 'Qualified' ? 'bg-green-100 text-green-800'
+      : ($r1['status'] === 'Absent' ? 'bg-gray-200 text-gray-600' : 'bg-amber-100 text-amber-800');
+?>
+  <h2 class="font-semibold text-navy mb-3">Your Round 1 Result</h2>
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto mb-8">
+    <table class="min-w-full text-sm">
+      <thead class="bg-lightgrey text-gray-600 text-left">
+        <tr>
+          <th class="px-4 py-3">Started / Completed</th>
+          <th class="px-4 py-3">Duration</th>
+          <th class="px-4 py-3">% Marks</th>
+          <th class="px-4 py-3">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="px-4 py-3 text-gray-600 text-xs">
+            <?php if ($r1['attempted']): ?>
+              <div><span class="text-gray-400">Start:</span> <?= e(date('d M Y, H:i:s', strtotime((string)$r1['start']))) ?></div>
+              <div><span class="text-gray-400">End:</span> <?= e(date('d M Y, H:i:s', strtotime((string)$r1['end']))) ?></div>
+            <?php else: ?>—<?php endif; ?>
+          </td>
+          <td class="px-4 py-3 text-gray-600"><?= $r1['attempted'] ? e($r1['duration']) : '—' ?></td>
+          <td class="px-4 py-3 font-bold text-navy"><?= $r1['attempted'] ? number_format((float)$r1['pct'], 2) . '%' : '—' ?></td>
+          <td class="px-4 py-3"><span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium <?= $statusCls ?>"><?= e($r1['status']) ?></span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+<?php endif; ?>
+
 <h2 class="font-semibold text-navy mb-3">Your Quiz Slots</h2>
 
 <?php if (!$slots): ?>
