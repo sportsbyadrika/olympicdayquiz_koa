@@ -90,6 +90,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 }
 
 // Filters + pagination
+$fQ = get('q');
 $fRound = get('round');
 $fDiff = get('difficulty');
 $fSport = get('sport');
@@ -99,6 +100,10 @@ $perPage = 15;
 
 $where = '1=1';
 $params = [];
+if ($fQ !== '') {
+    $where .= ' AND (question_text LIKE :q OR option_a LIKE :q OR option_b LIKE :q OR option_c LIKE :q OR option_d LIKE :q)';
+    $params[':q'] = '%' . $fQ . '%';
+}
 if (in_array($fRound, ['round1','round2','either'], true)) { $where .= ' AND suggested_round = :r'; $params[':r'] = $fRound; }
 if (in_array($fDiff, ['Easy','Medium','Hard'], true)) { $where .= ' AND difficulty = :diff'; $params[':diff'] = $fDiff; }
 if ($fSport !== '') { $where .= ' AND sport LIKE :sp'; $params[':sp'] = '%' . $fSport . '%'; }
@@ -126,7 +131,8 @@ require dirname(__DIR__) . '/includes/header.php';
   <button onclick="openAdd()" class="bg-teal text-white rounded-lg px-4 py-2 text-sm font-medium min-h-[44px]">+ Add Question</button>
 </div>
 
-<form method="get" class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-6 grid sm:grid-cols-5 gap-3">
+<form method="get" class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-6 grid sm:grid-cols-2 lg:grid-cols-6 gap-3">
+  <input name="q" value="<?= e($fQ) ?>" placeholder="Search question / options" class="border border-gray-300 rounded-lg px-3 py-2.5 text-sm sm:col-span-2 lg:col-span-2">
   <select name="round" class="border border-gray-300 rounded-lg px-3 py-2.5 text-sm">
     <option value="">Any round</option>
     <option value="round1" <?= $fRound==='round1'?'selected':'' ?>>Round 1</option>
