@@ -27,6 +27,7 @@ function nav_links(?string $role): array
                 ['/admin/experts.php', 'Experts'],
                 ['/admin/schools.php', 'Schools'],
                 ['/admin/online_status.php', 'Online Status'],
+                ['/admin/chat.php', 'Chat'],
                 ['/admin/login_history.php', 'Login History'],
                 ['/admin/settings.php', 'Settings'],
             ];
@@ -43,11 +44,13 @@ function nav_links(?string $role): array
                 ['/expert/master_questions.php', 'Master Bank'],
                 ['/expert/slots.php', 'Slots'],
                 ['/expert/online_status.php', 'Online Status'],
+                ['/expert/chat.php', 'Chat'],
                 ['/expert/results.php', 'Results'],
             ];
         case 'school':
             return [
                 ['/school/index.php', 'Dashboard'],
+                ['/school/chat.php', 'Chat'],
             ];
         default:
             return [
